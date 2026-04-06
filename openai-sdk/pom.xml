@@ -10,7 +10,7 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>anthropic-api</artifactId>
+    <artifactId>openai-sdk</artifactId>
 
     <dependencies>
         <dependency>

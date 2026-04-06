@@ -1,6 +1,6 @@
-# openai-api
+# openai-sdk
 
-`openai-api` adapts canonical tools from `ai-core` into OpenAI function/tool payloads and executes returned tool calls.
+`openai-sdk` adapts canonical tools from `ai-core` into OpenAI function/tool payloads and executes returned tool calls.
 
 ## Build catalog and wrapper
 

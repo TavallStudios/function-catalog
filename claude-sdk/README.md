@@ -1,6 +1,6 @@
-# anthropic-api
+# claude-sdk
 
-`anthropic-api` adapts canonical tools from `ai-core` into Anthropic `tools` entries and executes `tool_use` blocks.
+`claude-sdk` adapts canonical tools from `ai-core` into Anthropic `tools` entries and executes `tool_use` blocks.
 
 ## Build catalog and wrapper
 

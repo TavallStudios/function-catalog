@@ -10,10 +10,10 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>gemini-api</module>
+        <module>gemini-sdk</module>
         <module>ai-core</module>
-        <module>openai-api</module>
-        <module>anthropic-api</module>
+        <module>openai-sdk</module>
+        <module>claude-sdk</module>
         <module>mcp-server</module>
     </modules>
 
