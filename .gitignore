@@ -37,3 +37,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# Diagnostics logs (tracked for postmortems)
+!docs/diagnostics/
+!docs/diagnostics/*.log
