@@ -1,0 +1,22 @@
+[versions]
+assertj = "3.27.7"
+classgraph = "4.8.179"
+google-genai = "1.38.0"
+jackson = "2.20.1"
+junit = "5.11.4"
+mcp = "1.0.0"
+mockito = "5.21.0"
+slf4j = "2.0.16"
+
+[libraries]
+assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+classgraph = { module = "io.github.classgraph:classgraph", version.ref = "classgraph" }
+google-genai = { module = "com.google.genai:google-genai", version.ref = "google-genai" }
+jackson = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+junit = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.4" }
+mcp-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcp" }
+mcp-jackson = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+slf4j = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
