@@ -48,12 +48,13 @@ public final class AIFunctionMcpToolPublisher {
                 continue;
             }
 
+            String publishedFunctionName = definition.getName();
             McpSchema.JsonSchema inputSchema = objectMapper.convertValue(
                     definition.getCanonicalParametersSchema(),
                     McpSchema.JsonSchema.class
             );
             McpSchema.Tool tool = McpSchema.Tool.builder()
-                    .name(definition.getName())
+                    .name(publishedFunctionName)
                     .description(definition.getDescription())
                     .inputSchema(inputSchema)
                     .build();
@@ -61,7 +62,7 @@ public final class AIFunctionMcpToolPublisher {
                     tool,
                     (exchange, request) -> invoke(
                             safeCatalog,
-                            request.name(),
+                            publishedFunctionName,
                             request.arguments()
                     )
             ));
