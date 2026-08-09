@@ -11,35 +11,28 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-/**
- * A fail-closed, invocation-capable view over an {@link AIFunctionCatalog}.
- *
- * <p>Views are intended for agents and integrations that must receive only the
- * function surface allowed by their capability, job, environment, and
- * authorization policy. Filtering therefore applies both when definitions are
- * listed and when a function is invoked. A caller cannot invoke a hidden
- * function simply by knowing its catalog name.</p>
- */
+/** Fail-closed invocation-capable view that publishes metadata-only function definitions. */
 public final class AIFunctionCatalogView {
     public static final String SCOPE_DENIED_ERROR_CODE = "scope_denied";
 
     private final AIFunctionCatalog catalog;
-    private final Predicate<AIFunctionDefinition> functionFilter;
+    private final Predicate<AIFunctionPublicationDefinition> functionFilter;
 
     public AIFunctionCatalogView(
             AIFunctionCatalog catalog,
-            Predicate<AIFunctionDefinition> functionFilter
+            Predicate<AIFunctionPublicationDefinition> functionFilter
     ) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.functionFilter = Objects.requireNonNull(functionFilter, "functionFilter");
     }
 
-    public Map<String, AIFunctionDefinition> getFunctionDefinitions() {
+    public Map<String, AIFunctionPublicationDefinition> getFunctionDefinitions() {
         synchronized (catalog) {
-            Map<String, AIFunctionDefinition> definitions = new LinkedHashMap<>();
+            Map<String, AIFunctionPublicationDefinition> definitions = new LinkedHashMap<>();
             for (Map.Entry<String, AIFunctionDefinition> entry : catalog.getFunctionDefinitions().entrySet()) {
-                if (functionFilter.test(entry.getValue())) {
-                    definitions.put(entry.getKey(), entry.getValue());
+                AIFunctionPublicationDefinition publication = publication(entry.getValue());
+                if (functionFilter.test(publication)) {
+                    definitions.put(entry.getKey(), publication);
                 }
             }
             return Collections.unmodifiableMap(definitions);
@@ -50,7 +43,7 @@ public final class AIFunctionCatalogView {
         String safeFunctionName = requireText(functionName, "functionName");
         synchronized (catalog) {
             AIFunctionDefinition definition = catalog.getFunctionDefinitions().get(safeFunctionName);
-            return definition != null && functionFilter.test(definition);
+            return definition != null && functionFilter.test(publication(definition));
         }
     }
 
@@ -74,7 +67,7 @@ public final class AIFunctionCatalogView {
                 return catalog.invokeResult(callId, safeFunctionName, safeArguments);
             }
 
-            if (!functionFilter.test(definition)) {
+            if (!functionFilter.test(publication(definition))) {
                 String message = "Function '" + safeFunctionName + "' is outside this catalog view.";
                 ObjectNode payload = JsonNodeFactory.instance.objectNode();
                 payload.put("errorCode", SCOPE_DENIED_ERROR_CODE);
@@ -92,6 +85,10 @@ public final class AIFunctionCatalogView {
 
             return catalog.invokeResult(callId, safeFunctionName, safeArguments);
         }
+    }
+
+    private static AIFunctionPublicationDefinition publication(AIFunctionDefinition definition) {
+        return AIFunctionPublicationDefinition.from(definition);
     }
 
     private static String requireText(String value, String fieldName) {
