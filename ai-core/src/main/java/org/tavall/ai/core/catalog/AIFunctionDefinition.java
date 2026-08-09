@@ -86,12 +86,13 @@ public final class AIFunctionDefinition {
         return canonicalParametersSchema.deepCopy();
     }
 
-    /* Invocation internals are deliberately not part of the publication/capability API. */
-    Method getMethod() {
+    /** Trusted catalog/runtime API. Capability-scoped views never publish this object. */
+    public Method getMethod() {
         return method;
     }
 
-    Object getTarget() {
+    /** Trusted catalog/runtime API. Capability-scoped views never publish this object. */
+    public Object getTarget() {
         return target;
     }
 
