@@ -32,15 +32,9 @@ subprojects {
         withSourcesJar()
         withJavadocJar()
     }
-    repositories {
-        mavenCentral()
-    }
-    dependencyLocking {
-        lockAllConfigurations()
-    }
-    tasks.withType<JavaCompile>().configureEach {
-        options.compilerArgs.add("-parameters")
-    }
+    repositories { mavenCentral() }
+    dependencyLocking { lockAllConfigurations() }
+    tasks.withType<JavaCompile>().configureEach { options.compilerArgs.add("-parameters") }
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
         maxHeapSize = "256m"
@@ -63,9 +57,7 @@ subprojects {
             }
         }
     }
-    tasks.named("check") {
-        dependsOn(verifyJarContents)
-    }
+    tasks.named("check") { dependsOn(verifyJarContents) }
     extensions.configure<PublishingExtension> {
         publications {
             create<MavenPublication>("mavenJava") {
@@ -94,6 +86,17 @@ project(":ai-core") {
         "api"(jackson)
         "api"(slf4j)
         "api"(classgraph)
+        "testImplementation"(junit)
+        "testImplementation"(assertj)
+        "testRuntimeOnly"(junitLauncher)
+    }
+}
+
+project(":agent-runtime") {
+    dependencies {
+        "api"(project(":ai-core"))
+        "api"(jackson)
+        "api"(slf4j)
         "testImplementation"(junit)
         "testImplementation"(assertj)
         "testRuntimeOnly"(junitLauncher)
@@ -139,9 +142,7 @@ project(":mcp-server") {
         "testRuntimeOnly"(junitLauncher)
     }
     tasks.named<Test>("test") {
-        useJUnitPlatform {
-            excludeTags("integration")
-        }
+        useJUnitPlatform { excludeTags("integration") }
     }
     val testSourceSet = extensions.getByType<SourceSetContainer>().named("test")
     tasks.register<Test>("integrationTest") {
@@ -149,9 +150,7 @@ project(":mcp-server") {
         group = LifecycleBasePlugin.VERIFICATION_GROUP
         testClassesDirs = testSourceSet.get().output.classesDirs
         classpath = testSourceSet.get().runtimeClasspath
-        useJUnitPlatform {
-            includeTags("integration")
-        }
+        useJUnitPlatform { includeTags("integration") }
         shouldRunAfter(tasks.named("test"))
     }
 }
@@ -167,6 +166,4 @@ val stageRuntime = tasks.register<Sync>("stageRuntime") {
     }
 }
 
-tasks.named("assemble") {
-    dependsOn(stageRuntime)
-}
+tasks.named("assemble") { dependsOn(stageRuntime) }
