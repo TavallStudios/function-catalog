@@ -24,7 +24,7 @@ class AIAgentRuntimeTest {
         TestFunctions functions = new TestFunctions();
         catalog.registerInstances(functions);
         AtomicBoolean providerCalled = new AtomicBoolean();
-        AIAgentProvider provider = providerCalled("test", request -> {
+        AIAgentProvider provider = provider("test", providerCalled, request -> {
             assertThat(request.functionView().getFunctionDefinitions()).containsOnlyKeys("safe_read");
             var denied = request.functionView().invokeResult("dangerous_write", mapper.createObjectNode());
             return new AIAgentExecutionResult(AIAgentExecutionStatus.COMPLETED, denied.getPayload(), 999, 0, "");
@@ -63,7 +63,7 @@ class AIAgentRuntimeTest {
         AIAgentRuntime runtime = new AIAgentRuntime(
                 root,
                 (catalog, definition, job) -> new AIFunctionCatalogView(other, ignored -> true),
-                List.of(providerCalled("test", request -> completed()))
+                List.of(provider("test", providerCalled, request -> completed()))
         );
 
         AIAgentExecutionResult result = runtime.execute(
@@ -83,7 +83,7 @@ class AIAgentRuntimeTest {
         AIFunctionCatalog catalog = new AIFunctionCatalog(mapper);
         CountingFunctions functions = new CountingFunctions();
         catalog.registerInstances(functions);
-        AIAgentProvider provider = providerCalled("test", request -> {
+        AIAgentProvider provider = provider("test", new AtomicBoolean(), request -> {
             assertThat(request.functionView().invokeResult("counted_write", mapper.createObjectNode()).isSuccess())
                     .isTrue();
             var second = request.functionView().invokeResult("counted_write", mapper.createObjectNode());
@@ -148,13 +148,11 @@ class AIAgentRuntimeTest {
         assertThat(result.output().path("errorCode").asText()).isEqualTo(AIAgentRuntime.PROVIDER_NOT_FOUND);
     }
 
-    private static AIAgentProvider providerCalled(
-            String id,
-            ProviderBody body
-    ) {
+    private static AIAgentProvider provider(String id, AtomicBoolean called, ProviderBody body) {
         return new AIAgentProvider() {
             public String providerId() { return id; }
             public AIAgentExecutionResult execute(AIAgentExecutionRequest request) throws Exception {
+                called.set(true);
                 return body.execute(request);
             }
         };
