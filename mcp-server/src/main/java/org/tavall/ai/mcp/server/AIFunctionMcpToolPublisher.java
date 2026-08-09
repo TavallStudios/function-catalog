@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
+import org.tavall.ai.core.catalog.AIFunctionCatalogView;
 import org.tavall.ai.core.catalog.AIFunctionDefinition;
 import org.tavall.ai.core.invocation.AIFunctionInvocationResult;
 
@@ -15,14 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
-/**
- * Publishes canonical Function Catalog definitions as MCP tool specifications.
- *
- * <p>The catalog remains the source of truth for function names, descriptions,
- * schemas, invocation policy, and audit behavior. Consumers may apply a
- * publication filter to expose a narrower capability view without duplicating
- * tool schemas or invocation adapters.</p>
- */
+/** Publishes canonical Function Catalog definitions as MCP tool specifications. */
 public final class AIFunctionMcpToolPublisher {
     private final ObjectMapper objectMapper;
 
@@ -31,23 +25,26 @@ public final class AIFunctionMcpToolPublisher {
     }
 
     public List<SyncToolSpecification> toolSpecifications(AIFunctionCatalog catalog) {
-        return toolSpecifications(catalog, ignored -> true);
+        return viewToolSpecifications(new AIFunctionCatalogView(
+                Objects.requireNonNull(catalog, "catalog"),
+                ignored -> true
+        ));
     }
 
     public List<SyncToolSpecification> toolSpecifications(
             AIFunctionCatalog catalog,
             Predicate<AIFunctionDefinition> publicationFilter
     ) {
-        AIFunctionCatalog safeCatalog = Objects.requireNonNull(catalog, "catalog");
-        Predicate<AIFunctionDefinition> safePublicationFilter =
-                Objects.requireNonNull(publicationFilter, "publicationFilter");
+        return viewToolSpecifications(new AIFunctionCatalogView(
+                Objects.requireNonNull(catalog, "catalog"),
+                Objects.requireNonNull(publicationFilter, "publicationFilter")
+        ));
+    }
 
+    public List<SyncToolSpecification> viewToolSpecifications(AIFunctionCatalogView catalogView) {
+        AIFunctionCatalogView safeCatalogView = Objects.requireNonNull(catalogView, "catalogView");
         List<SyncToolSpecification> specifications = new ArrayList<>();
-        for (AIFunctionDefinition definition : safeCatalog.getFunctionDefinitions().values()) {
-            if (!safePublicationFilter.test(definition)) {
-                continue;
-            }
-
+        for (AIFunctionDefinition definition : safeCatalogView.getFunctionDefinitions().values()) {
             String publishedFunctionName = definition.getName();
             McpSchema.JsonSchema inputSchema = objectMapper.convertValue(
                     definition.getCanonicalParametersSchema(),
@@ -61,7 +58,7 @@ public final class AIFunctionMcpToolPublisher {
             specifications.add(new SyncToolSpecification(
                     tool,
                     (exchange, request) -> invoke(
-                            safeCatalog,
+                            safeCatalogView,
                             publishedFunctionName,
                             request.arguments()
                     )
@@ -71,12 +68,12 @@ public final class AIFunctionMcpToolPublisher {
     }
 
     private McpSchema.CallToolResult invoke(
-            AIFunctionCatalog catalog,
+            AIFunctionCatalogView catalogView,
             String functionName,
             Map<String, Object> arguments
     ) {
         JsonNode argumentsNode = objectMapper.valueToTree(arguments == null ? Map.of() : arguments);
-        AIFunctionInvocationResult result = catalog.invokeResult(functionName, argumentsNode);
+        AIFunctionInvocationResult result = catalogView.invokeResult(functionName, argumentsNode);
         return new McpSchema.CallToolResult(
                 List.of(new McpSchema.TextContent(writeJson(result.getPayload()))),
                 result.isError(),
