@@ -7,6 +7,7 @@ import io.modelcontextprotocol.spec.McpSchema;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
 import org.tavall.ai.core.catalog.AIFunctionCatalogView;
 import org.tavall.ai.core.catalog.AIFunctionDefinition;
+import org.tavall.ai.core.catalog.AIFunctionPublicationDefinition;
 import org.tavall.ai.core.invocation.AIFunctionInvocationResult;
 
 import java.io.IOException;
@@ -31,20 +32,29 @@ public final class AIFunctionMcpToolPublisher {
         ));
     }
 
+    /** Preserves the pre-view predicate API for existing trusted in-process publishers. */
     public List<SyncToolSpecification> toolSpecifications(
             AIFunctionCatalog catalog,
             Predicate<AIFunctionDefinition> publicationFilter
     ) {
+        AIFunctionCatalog safeCatalog = Objects.requireNonNull(catalog, "catalog");
+        Predicate<AIFunctionDefinition> safeFilter = Objects.requireNonNull(
+                publicationFilter,
+                "publicationFilter"
+        );
         return viewToolSpecifications(new AIFunctionCatalogView(
-                Objects.requireNonNull(catalog, "catalog"),
-                Objects.requireNonNull(publicationFilter, "publicationFilter")
+                safeCatalog,
+                publication -> {
+                    AIFunctionDefinition current = safeCatalog.getFunctionDefinitions().get(publication.getName());
+                    return current != null && safeFilter.test(current);
+                }
         ));
     }
 
     public List<SyncToolSpecification> viewToolSpecifications(AIFunctionCatalogView catalogView) {
         AIFunctionCatalogView safeCatalogView = Objects.requireNonNull(catalogView, "catalogView");
         List<SyncToolSpecification> specifications = new ArrayList<>();
-        for (AIFunctionDefinition definition : safeCatalogView.getFunctionDefinitions().values()) {
+        for (AIFunctionPublicationDefinition definition : safeCatalogView.getFunctionDefinitions().values()) {
             String publishedFunctionName = definition.getName();
             McpSchema.JsonSchema inputSchema = objectMapper.convertValue(
                     definition.getCanonicalParametersSchema(),
