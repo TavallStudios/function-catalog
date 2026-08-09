@@ -86,11 +86,12 @@ public final class AIFunctionDefinition {
         return canonicalParametersSchema.deepCopy();
     }
 
-    public Method getMethod() {
+    /* Invocation internals are deliberately not part of the publication/capability API. */
+    Method getMethod() {
         return method;
     }
 
-    public Object getTarget() {
+    Object getTarget() {
         return target;
     }
 
