@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.tavall.ai.core.annotation.AIFunction;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +25,8 @@ class AIFunctionCatalogViewTest {
         );
 
         assertThat(view.getFunctionDefinitions()).containsOnlyKeys("agent_status");
+        assertThat(view.getFunctionDefinitions().get("agent_status"))
+                .isInstanceOf(AIFunctionPublicationDefinition.class);
         assertThat(view.allows("agent_status")).isTrue();
         assertThat(view.allows("internal_delete")).isFalse();
 
@@ -38,9 +41,22 @@ class AIFunctionCatalogViewTest {
     }
 
     @Test
-    void publishedDefinitionsDoNotExposeLiveInvocationTargets() {
+    void publicationDefinitionsContainNoInvocationObjects() {
+        assertThat(Arrays.stream(AIFunctionPublicationDefinition.class.getDeclaredFields())
+                .map(Field::getName))
+                .doesNotContain("method", "target", "ownerType", "javaType");
+        assertThat(Arrays.stream(AIFunctionPublicationDefinition.class.getMethods())
+                .map(Method::getReturnType))
+                .doesNotContain(Method.class, Class.class, AIFunctionDefinition.class);
+        assertThat(Arrays.stream(AIFunctionPublicationParameterDefinition.class.getMethods())
+                .map(Method::getReturnType))
+                .doesNotContain(Class.class, AIFunctionDefinition.class);
+    }
+
+    @Test
+    void trustedCatalogDefinitionApiRemainsSourceCompatible() {
         assertThat(Arrays.stream(AIFunctionDefinition.class.getMethods()).map(Method::getName))
-                .doesNotContain("getTarget", "getMethod");
+                .contains("getTarget", "getMethod");
     }
 
     private static final class TestFunctions {
@@ -51,7 +67,7 @@ class AIFunctionCatalogViewTest {
             return "ok";
         }
 
-        @AIFunction(name = "internal_delete", description = "Hidden destructive capability")
+        @AIFunction(name = "internal_delete", description = "Internal-only capability")
         String delete() {
             hiddenInvocations.incrementAndGet();
             return "deleted";
