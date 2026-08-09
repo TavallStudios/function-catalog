@@ -45,10 +45,10 @@ class AIFunctionCatalogViewTest {
         assertThat(Arrays.stream(AIFunctionPublicationDefinition.class.getDeclaredFields())
                 .map(Field::getName))
                 .doesNotContain("method", "target", "ownerType", "javaType");
-        assertThat(Arrays.stream(AIFunctionPublicationDefinition.class.getMethods())
+        assertThat(Arrays.stream(AIFunctionPublicationDefinition.class.getDeclaredMethods())
                 .map(Method::getReturnType))
                 .doesNotContain(Method.class, Class.class, AIFunctionDefinition.class);
-        assertThat(Arrays.stream(AIFunctionPublicationParameterDefinition.class.getMethods())
+        assertThat(Arrays.stream(AIFunctionPublicationParameterDefinition.class.getDeclaredMethods())
                 .map(Method::getReturnType))
                 .doesNotContain(Class.class, AIFunctionDefinition.class);
     }
