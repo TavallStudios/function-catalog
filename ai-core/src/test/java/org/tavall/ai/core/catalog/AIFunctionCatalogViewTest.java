@@ -1,0 +1,76 @@
+package org.tavall.ai.core.catalog;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.tavall.ai.core.annotation.AIFunction;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class AIFunctionCatalogViewTest {
+    @Test
+    void filtersDiscoveryAndFailsClosedForHiddenInvocations() {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        TestFunctions functions = new TestFunctions();
+        AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+        catalog.registerInstances(functions);
+
+        AIFunctionCatalogView view = new AIFunctionCatalogView(
+                catalog,
+                definition -> definition.getName().startsWith("agent_")
+        );
+
+        assertThat(view.getFunctionDefinitions()).containsOnlyKeys("agent_status");
+        assertThat(view.getFunctionDefinitions().get("agent_status"))
+                .isInstanceOf(AIFunctionPublicationDefinition.class);
+        assertThat(view.allows("agent_status")).isTrue();
+        assertThat(view.allows("internal_delete")).isFalse();
+
+        var allowed = view.invokeResult("agent_status", objectMapper.createObjectNode());
+        var denied = view.invokeResult("internal_delete", objectMapper.createObjectNode());
+
+        assertThat(allowed.isSuccess()).isTrue();
+        assertThat(allowed.getPayload().asText()).isEqualTo("ok");
+        assertThat(denied.isError()).isTrue();
+        assertThat(denied.getErrorCode()).isEqualTo(AIFunctionCatalogView.SCOPE_DENIED_ERROR_CODE);
+        assertThat(functions.hiddenInvocations.get()).isZero();
+    }
+
+    @Test
+    void publicationDefinitionsContainNoInvocationObjects() {
+        assertThat(Arrays.stream(AIFunctionPublicationDefinition.class.getDeclaredFields())
+                .map(Field::getName))
+                .doesNotContain("method", "target", "ownerType", "javaType");
+        assertThat(Arrays.stream(AIFunctionPublicationDefinition.class.getDeclaredMethods())
+                .map(Method::getReturnType))
+                .doesNotContain(Method.class, Class.class, AIFunctionDefinition.class);
+        assertThat(Arrays.stream(AIFunctionPublicationParameterDefinition.class.getDeclaredMethods())
+                .map(Method::getReturnType))
+                .doesNotContain(Class.class, AIFunctionDefinition.class);
+    }
+
+    @Test
+    void trustedCatalogDefinitionApiRemainsSourceCompatible() {
+        assertThat(Arrays.stream(AIFunctionDefinition.class.getMethods()).map(Method::getName))
+                .contains("getTarget", "getMethod");
+    }
+
+    private static final class TestFunctions {
+        private final AtomicInteger hiddenInvocations = new AtomicInteger();
+
+        @AIFunction(name = "agent_status", description = "Visible agent capability")
+        String status() {
+            return "ok";
+        }
+
+        @AIFunction(name = "internal_delete", description = "Internal-only capability")
+        String delete() {
+            hiddenInvocations.incrementAndGet();
+            return "deleted";
+        }
+    }
+}

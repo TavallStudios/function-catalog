@@ -3,21 +3,24 @@ package org.tavall.ai.core.catalog;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
-public final class AIFunctionDefinition {
+/**
+ * Immutable publication metadata for one Function Catalog entry.
+ *
+ * <p>This type deliberately retains no {@link java.lang.reflect.Method}, target instance,
+ * {@link Class}, or Jackson {@code JavaType}. It is safe to hand to capability-scoped agents for
+ * discovery and filtering without also handing them the catalog's live invocation objects.</p>
+ */
+public final class AIFunctionPublicationDefinition {
     private final String name;
     private final String description;
     private final String signature;
-    private final List<AIFunctionParameterDefinition> parameters;
+    private final List<AIFunctionPublicationParameterDefinition> parameters;
     private final List<String> requiredParameters;
     private final ObjectNode canonicalParametersSchema;
-    private final Method method;
-    private final Object target;
-    private final Class<?> ownerType;
+    private final String ownerTypeName;
     private final AIFunctionRegistrationSource registrationSource;
     private final boolean enabled;
     private final ObjectNode settingsSchema;
@@ -26,16 +29,14 @@ public final class AIFunctionDefinition {
     private final String settingsDescription;
     private final String updatedAt;
 
-    public AIFunctionDefinition(
+    private AIFunctionPublicationDefinition(
             String name,
             String description,
             String signature,
-            List<AIFunctionParameterDefinition> parameters,
+            List<AIFunctionPublicationParameterDefinition> parameters,
             List<String> requiredParameters,
             ObjectNode canonicalParametersSchema,
-            Method method,
-            Object target,
-            Class<?> ownerType,
+            String ownerTypeName,
             AIFunctionRegistrationSource registrationSource,
             boolean enabled,
             ObjectNode settingsSchema,
@@ -47,19 +48,49 @@ public final class AIFunctionDefinition {
         this.name = requireText(name, "name");
         this.description = description == null ? "" : description;
         this.signature = requireText(signature, "signature");
-        this.parameters = Collections.unmodifiableList(new ArrayList<>(requireValue(parameters, "parameters")));
-        this.requiredParameters = Collections.unmodifiableList(new ArrayList<>(requireValue(requiredParameters, "requiredParameters")));
-        this.canonicalParametersSchema = requireValue(canonicalParametersSchema, "canonicalParametersSchema").deepCopy();
-        this.method = requireValue(method, "method");
-        this.target = target;
-        this.ownerType = requireValue(ownerType, "ownerType");
-        this.registrationSource = requireValue(registrationSource, "registrationSource");
+        this.parameters = List.copyOf(Objects.requireNonNull(parameters, "parameters"));
+        this.requiredParameters = List.copyOf(Objects.requireNonNull(requiredParameters, "requiredParameters"));
+        this.canonicalParametersSchema = Objects.requireNonNull(
+                canonicalParametersSchema,
+                "canonicalParametersSchema"
+        ).deepCopy();
+        this.ownerTypeName = requireText(ownerTypeName, "ownerTypeName");
+        this.registrationSource = Objects.requireNonNull(registrationSource, "registrationSource");
         this.enabled = enabled;
         this.settingsSchema = settingsSchema == null ? null : settingsSchema.deepCopy();
         this.settings = settings == null ? null : settings.deepCopy();
         this.defaultSettings = defaultSettings == null ? null : defaultSettings.deepCopy();
         this.settingsDescription = settingsDescription == null ? "" : settingsDescription;
         this.updatedAt = updatedAt == null ? "" : updatedAt;
+    }
+
+    static AIFunctionPublicationDefinition from(AIFunctionDefinition definition) {
+        AIFunctionDefinition safeDefinition = Objects.requireNonNull(definition, "definition");
+        List<AIFunctionPublicationParameterDefinition> publishedParameters = safeDefinition.getParameters().stream()
+                .map(parameter -> new AIFunctionPublicationParameterDefinition(
+                        parameter.getIndex(),
+                        parameter.getName(),
+                        parameter.getDescription(),
+                        parameter.getJavaType().toCanonical(),
+                        parameter.isRequired()
+                ))
+                .toList();
+        return new AIFunctionPublicationDefinition(
+                safeDefinition.getName(),
+                safeDefinition.getDescription(),
+                safeDefinition.getSignature(),
+                publishedParameters,
+                safeDefinition.getRequiredParameters(),
+                safeDefinition.getCanonicalParametersSchema(),
+                safeDefinition.getOwnerType().getName(),
+                safeDefinition.getRegistrationSource(),
+                safeDefinition.isEnabled(),
+                safeDefinition.getSettingsSchema(),
+                safeDefinition.getSettings(),
+                safeDefinition.getDefaultSettings(),
+                safeDefinition.getSettingsDescription(),
+                safeDefinition.getUpdatedAt()
+        );
     }
 
     public String getName() {
@@ -74,7 +105,7 @@ public final class AIFunctionDefinition {
         return signature;
     }
 
-    public List<AIFunctionParameterDefinition> getParameters() {
+    public List<AIFunctionPublicationParameterDefinition> getParameters() {
         return parameters;
     }
 
@@ -86,18 +117,8 @@ public final class AIFunctionDefinition {
         return canonicalParametersSchema.deepCopy();
     }
 
-    /** Trusted catalog/runtime API. Capability-scoped views never publish this object. */
-    public Method getMethod() {
-        return method;
-    }
-
-    /** Trusted catalog/runtime API. Capability-scoped views never publish this object. */
-    public Object getTarget() {
-        return target;
-    }
-
-    public Class<?> getOwnerType() {
-        return ownerType;
+    public String getOwnerTypeName() {
+        return ownerTypeName;
     }
 
     public AIFunctionRegistrationSource getRegistrationSource() {
@@ -132,23 +153,10 @@ public final class AIFunctionDefinition {
         return updatedAt;
     }
 
-    public boolean isStatic() {
-        return java.lang.reflect.Modifier.isStatic(method.getModifiers());
-    }
-
-    private static <T> T requireValue(T value, String fieldName) {
-        if (value != null) {
-            return value;
-        }
-
-        throw new IllegalArgumentException(fieldName + " must not be null");
-    }
-
     private static String requireText(String value, String fieldName) {
         if (value != null && !value.isBlank()) {
             return value;
         }
-
         throw new IllegalArgumentException(fieldName + " must not be blank");
     }
 }
