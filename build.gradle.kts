@@ -103,6 +103,17 @@ project(":agent-runtime") {
     }
 }
 
+project(":codex-agent-provider") {
+    dependencies {
+        "api"(project(":agent-runtime"))
+        "api"(jackson)
+        "api"(slf4j)
+        "testImplementation"(junit)
+        "testImplementation"(assertj)
+        "testRuntimeOnly"(junitLauncher)
+    }
+}
+
 for (module in listOf(":openai-sdk", ":claude-sdk")) {
     project(module) {
         dependencies {
