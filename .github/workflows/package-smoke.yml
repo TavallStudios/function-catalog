@@ -1,0 +1,30 @@
+name: Package smoke
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Resolve Function Catalog 1.0.1 packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://maven.pkg.github.com/TavallStudios/function-catalog/org/tavall'
+          for artifact in ai-core mcp-server; do
+            url="$base/$artifact/1.0.1/$artifact-1.0.1.pom"
+            echo "Resolving $artifact:1.0.1"
+            curl --fail --silent --show-error --location \
+              --user "$GITHUB_ACTOR:$GITHUB_TOKEN" \
+              --output "/tmp/$artifact.pom" \
+              "$url"
+            grep -q '<version>1.0.1</version>' "/tmp/$artifact.pom"
+          done
