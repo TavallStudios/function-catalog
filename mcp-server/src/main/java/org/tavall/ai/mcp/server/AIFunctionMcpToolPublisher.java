@@ -9,6 +9,7 @@ import org.tavall.ai.core.catalog.AIFunctionCatalogView;
 import org.tavall.ai.core.catalog.AIFunctionDefinition;
 import org.tavall.ai.core.catalog.AIFunctionPublicationDefinition;
 import org.tavall.ai.core.invocation.AIFunctionInvocationResult;
+import org.tavall.ai.core.invocation.AIFunctionOutput;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -95,12 +96,65 @@ public final class AIFunctionMcpToolPublisher {
     }
 
     private McpSchema.CallToolResult result(AIFunctionInvocationResult result) {
+        JsonNode invocationPayload = result.getPayload();
+        JsonNode structuredPayload = invocationPayload;
+        List<McpSchema.Content> content = new ArrayList<>();
+
+        if (isRichOutput(invocationPayload)) {
+            structuredPayload = invocationPayload.path("payload");
+            JsonNode richContents = invocationPayload.path("contents");
+            if (!richContents.isArray()) {
+                throw new IllegalStateException("Rich function output contents must be an array.");
+            }
+            for (JsonNode richContent : richContents) {
+                content.add(toMcpContent(richContent));
+            }
+        }
+
+        content.addFirst(new McpSchema.TextContent(writeJson(structuredPayload)));
         return new McpSchema.CallToolResult(
-                List.of(new McpSchema.TextContent(writeJson(result.getPayload()))),
+                List.copyOf(content),
                 result.isError(),
-                objectMapper.convertValue(result.getPayload(), Object.class),
+                objectMapper.convertValue(structuredPayload, Object.class),
                 null
         );
+    }
+
+    private boolean isRichOutput(JsonNode payload) {
+        return payload != null
+                && payload.isObject()
+                && AIFunctionOutput.OUTPUT_TYPE.equals(payload.path("outputType").asText());
+    }
+
+    private McpSchema.Content toMcpContent(JsonNode content) {
+        String type = requiredText(content, "type");
+        String data = requiredText(content, "data");
+        String mimeType = requiredText(content, "mimeType");
+        return switch (type) {
+            case "image" -> {
+                if (!mimeType.startsWith("image/")) {
+                    throw new IllegalStateException("Rich image content must use an image MIME type.");
+                }
+                yield new McpSchema.ImageContent(null, data, mimeType);
+            }
+            case "resource" -> new McpSchema.EmbeddedResource(
+                    null,
+                    new McpSchema.BlobResourceContents(
+                            requiredText(content, "uri"),
+                            mimeType,
+                            data
+                    )
+            );
+            default -> throw new IllegalStateException("Unsupported rich function content type: " + type);
+        };
+    }
+
+    private String requiredText(JsonNode node, String fieldName) {
+        String value = node.path(fieldName).asText("").strip();
+        if (value.isEmpty()) {
+            throw new IllegalStateException("Rich function content is missing " + fieldName + ".");
+        }
+        return value;
     }
 
     private String writeJson(JsonNode payload) {
