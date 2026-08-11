@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: TavallStudios/tavall-cloud
-          ref: e4a96fdb9b4cc9ac5b7a949de5b3a885a90ea958
+          ref: 0353aaba46b239d254d78eca28319f5e7328d8da
           path: tavall-cloud
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-java@v4
