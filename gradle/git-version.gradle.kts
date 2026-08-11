@@ -30,5 +30,6 @@ val branch = providers.environmentVariable("GITHUB_HEAD_REF").orNull
     ?: providers.environmentVariable("GITHUB_REF_NAME").orNull?.takeIf(String::isNotBlank)
     ?: git("branch", "--show-current").ifBlank { "detached" }
 val qualifier = branch.replace('/', '_').replace(Regex("[^A-Za-z0-9_.-]"), "_")
+val requestedVersion = providers.gradleProperty("tavallVersion").orNull?.takeIf(String::isNotBlank)
 
-extra["gitVersion"] = "$numericVersion-$qualifier-SNAPSHOT"
+extra["gitVersion"] = requestedVersion ?: "$numericVersion-$qualifier-SNAPSHOT"
