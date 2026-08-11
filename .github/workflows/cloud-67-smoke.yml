@@ -1,0 +1,39 @@
+name: Tavall Cloud PR 67 smoke
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  validate-cloud-head:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_ACTOR: ${{ github.actor }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out exact Tavall Cloud PR 67 head
+        uses: actions/checkout@v4
+        with:
+          repository: TavallStudios/tavall-cloud
+          ref: e4a96fdb9b4cc9ac5b7a949de5b3a885a90ea958
+          path: tavall-cloud
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+          cache-dependency-path: tavall-cloud/**/*.gradle*
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify architecture imports
+        working-directory: tavall-cloud
+        run: ./scripts/verify-architecture-import.sh
+      - name: Build exact Cloud head
+        working-directory: tavall-cloud
+        run: ./gradlew --no-daemon --max-workers=1 clean build
+      - name: Run Cloud integration tests
+        working-directory: tavall-cloud
+        run: ./gradlew --no-daemon --max-workers=1 integrationTest
