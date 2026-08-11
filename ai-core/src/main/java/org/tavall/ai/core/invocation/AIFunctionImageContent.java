@@ -2,7 +2,8 @@ package org.tavall.ai.core.invocation;
 
 import java.util.Arrays;
 
-public final class AIFunctionImageContent {
+/** Image bytes returned as rich function content. */
+public final class AIFunctionImageContent implements AIFunctionContent {
     private final byte[] data;
     private final String mimeType;
 
@@ -17,10 +18,17 @@ public final class AIFunctionImageContent {
         this.mimeType = mimeType.strip().toLowerCase();
     }
 
+    @Override
+    public String getType() {
+        return "image";
+    }
+
+    @Override
     public byte[] getData() {
         return Arrays.copyOf(data, data.length);
     }
 
+    @Override
     public String getMimeType() {
         return mimeType;
     }
