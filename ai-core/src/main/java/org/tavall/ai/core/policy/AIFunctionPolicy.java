@@ -5,8 +5,8 @@ package org.tavall.ai.core.policy;
  *
  * <p>The catalog calls this contract after resolving an enabled function and before mapping
  * arguments or invoking the target method. Policies allow execution by returning normally and deny
- * execution by throwing an exception. Policy failures are converted into normal failed invocation
- * results by the catalog and are also reported through the configured audit logger.</p>
+ * execution by throwing a runtime exception. Policy failures are converted into normal failed
+ * invocation results by the catalog and are also reported through the configured audit logger.</p>
  */
 public interface AIFunctionPolicy {
 
@@ -15,8 +15,7 @@ public interface AIFunctionPolicy {
      *
      * @param invocationContext immutable invocation context containing the function name, raw JSON
      *                          arguments, and resolved function definition
-     * @throws Exception when invocation must be denied or cannot be evaluated; runtime exceptions
-     *                   are also accepted by the catalog's invocation boundary
+     * @throws RuntimeException when invocation must be denied or policy evaluation fails
      */
     void checkInvocation(AIFunctionInvocationContext invocationContext);
 }
