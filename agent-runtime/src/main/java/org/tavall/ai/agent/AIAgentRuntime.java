@@ -15,7 +15,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-/** Provider-neutral Tavall agent runtime. */
+/**
+ * Provider-neutral Tavall agent runtime that enforces provider identity, authoritative function
+ * views, tool/delegation budgets, and execution timeouts around one backend execution.
+ *
+ * <p>Providers execute on a dedicated virtual thread for each request. The runtime owns the
+ * effective function view and revokes it when execution finishes, fails, times out, or is
+ * interrupted, preventing a provider from continuing to invoke functions through the view after its
+ * execution boundary has ended.</p>
+ */
 public final class AIAgentRuntime {
     public static final String PROVIDER_NOT_FOUND = "provider_not_found";
     public static final String BUDGET_EXCEEDED = "budget_exceeded";
@@ -27,6 +35,19 @@ public final class AIAgentRuntime {
     private final AIAgentFunctionViewResolver functionViewResolver;
     private final Map<String, AIAgentProvider> providers;
 
+    /**
+     * Creates an agent runtime with a fixed provider registry.
+     *
+     * <p>Provider identifiers are validated as non-blank and must be unique for the lifetime of this
+     * runtime.</p>
+     *
+     * @param catalog authoritative function catalog used by agent executions
+     * @param functionViewResolver resolver that applies environment/job function policy
+     * @param providers provider adapters selectable by agent definitions
+     * @throws NullPointerException if the catalog, resolver, provider iterable, or an individual
+     *                              provider is {@code null}
+     * @throws IllegalArgumentException if a provider identifier is blank or duplicated
+     */
     public AIAgentRuntime(
             AIFunctionCatalog catalog,
             AIAgentFunctionViewResolver functionViewResolver,
@@ -46,6 +67,28 @@ public final class AIAgentRuntime {
         this.providers = Map.copyOf(byId);
     }
 
+    /**
+     * Executes one agent job within its declared provider and execution budget.
+     *
+     * <p>The runtime rejects jobs that already exceed the delegation budget, resolves the requested
+     * provider, obtains an authoritative function-policy view, verifies that the view is backed by
+     * this runtime's catalog, narrows it to the agent's requested function names, and applies the
+     * tool-call limit. Provider execution then runs on a virtual thread under the configured timeout.
+     * Provider exceptions, interruption, timeout, function-view mismatch, and budget violations are
+     * converted into {@link AIAgentExecutionStatus#FAILED} results rather than escaping as normal
+     * execution exceptions.</p>
+     *
+     * <p>The returned tool-call count is taken from the effective catalog view, not trusted from the
+     * provider result. The effective view is revoked in all completion paths.</p>
+     *
+     * @param definition agent definition selecting the provider and requested functions
+     * @param job concrete job to execute
+     * @param budget limits for tool calls, delegation depth, and wall-clock execution
+     * @return successful provider result normalized with authoritative tool-call accounting, or a
+     *         failed execution result carrying one of this runtime's error codes
+     * @throws NullPointerException if any argument is {@code null}, or if the resolver/provider
+     *                              violates its non-null return contract
+     */
     public AIAgentExecutionResult execute(
             AIAgentDefinition definition,
             AIAgentJob job,
