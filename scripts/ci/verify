@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+MAX_WORKERS="${TAVALL_CI_MAX_WORKERS:-1}"
+
+# Canonical Function Catalog verification entrypoint. Remote systems may invoke this exact
+# command and publish its status, but must not duplicate the build graph in workflow YAML.
+exec ./gradlew \
+  --no-daemon \
+  --max-workers="$MAX_WORKERS" \
+  clean \
+  check \
+  publishToMavenLocal \
+  stageRuntime

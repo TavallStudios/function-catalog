@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+VERSION="${1:-$(tr -d '[:space:]' < gradle/release-version.txt)}"
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Invalid Function Catalog release version: $VERSION" >&2
+  exit 2
+fi
+if [[ -z "${GITHUB_TOKEN:-}" || -z "${GITHUB_ACTOR:-}" ]]; then
+  echo "Publishing requires explicitly supplied GITHUB_TOKEN and GITHUB_ACTOR credentials." >&2
+  exit 1
+fi
+
+MAX_WORKERS="${TAVALL_CI_MAX_WORKERS:-1}"
+exec ./gradlew \
+  --no-daemon \
+  --max-workers="$MAX_WORKERS" \
+  -PtavallVersion="$VERSION" \
+  clean \
+  check \
+  publish
