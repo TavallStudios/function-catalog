@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+: "${FUNCTION_CATALOG_GITHUB_TOKEN:?Set FUNCTION_CATALOG_GITHUB_TOKEN for the explicitly authorized GitHub staging scope.}"
+: "${FUNCTION_CATALOG_GITHUB_REPOSITORIES:?Set FUNCTION_CATALOG_GITHUB_REPOSITORIES to a comma-separated owner/repo allowlist.}"
+
+APPLICATION="$ROOT/distribution/application.jar"
+LIBRARIES="$ROOT/distribution/libs/*"
+if [[ ! -f "$APPLICATION" ]]; then
+  cat >&2 <<'EOF'
+Function Catalog staged runtime is missing.
+Run the repository-local verification/staging command first (`scripts/ci/verify` after PR #12,
+or `./gradlew stageRuntime` on a branch that has not yet reconciled #12).
+EOF
+  exit 1
+fi
+
+exec java \
+  -cp "$APPLICATION:$LIBRARIES" \
+  org.tavall.ai.mcp.server.RepositoryStagingMcpServerLauncher \
+  "$@"
