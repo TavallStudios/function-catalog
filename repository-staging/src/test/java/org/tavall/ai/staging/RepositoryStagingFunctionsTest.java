@@ -80,19 +80,22 @@ class RepositoryStagingFunctionsTest {
     }
 
     @Test
-    void validateFlagsDirectToMainWorkWhenRepositoryStagingExists() {
+    void validateWarnsAboutDirectToMainWorkWithoutMakingIntentionalHotfixTopologyInvalid() {
         RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
         FakeProvider provider = new FakeProvider(List.of(
                 pull(10, "Runtime: Staging PR — Example", "staging/runtime", "main", stagingBody()),
-                pull(30, "wrong base", "working/wrong", "main", "feature")
+                pull(30, "possible hotfix", "working/hotfix", "main", "feature")
         ));
 
         StagingValidationResult result = new RepositoryStagingService(provider)
                 .validate(new RepositoryStagingRequest(repository));
 
+        assertThat(result.valid()).isTrue();
         assertThat(result.findings())
-                .extracting(StagingTopologyFinding::code)
-                .contains("DIRECT_TO_MAIN_WITH_ACTIVE_STAGING");
+                .filteredOn(finding -> finding.code().equals("DIRECT_TO_MAIN_WITH_ACTIVE_STAGING"))
+                .singleElement()
+                .extracting(StagingTopologyFinding::severity)
+                .isEqualTo(StagingFindingSeverity.WARNING);
     }
 
     @Test
