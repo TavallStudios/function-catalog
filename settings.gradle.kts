@@ -3,4 +3,13 @@ plugins {
 }
 
 rootProject.name = "function-catalog"
-include("gemini-sdk", "ai-core", "agent-runtime", "codex-agent-provider", "openai-sdk", "claude-sdk", "mcp-server")
+include(
+    "gemini-sdk",
+    "ai-core",
+    "repository-staging",
+    "agent-runtime",
+    "codex-agent-provider",
+    "openai-sdk",
+    "claude-sdk",
+    "mcp-server"
+)
