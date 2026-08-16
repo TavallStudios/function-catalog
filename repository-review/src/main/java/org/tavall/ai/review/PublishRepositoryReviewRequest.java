@@ -16,11 +16,8 @@ public record PublishRepositoryReviewRequest(
         if (pullRequestNumber <= 0) throw new IllegalArgumentException("pullRequestNumber must be positive");
         exactHeadSha = requireText(exactHeadSha, "exactHeadSha");
         Objects.requireNonNull(decision, "decision");
-        summary = summary == null ? "" : summary.trim();
+        summary = requireText(summary, "summary");
         comments = List.copyOf(comments == null ? List.of() : comments);
-        if (decision != RepositoryReviewDecision.APPROVE && summary.isBlank()) {
-            throw new IllegalArgumentException("summary is required for COMMENT or REQUEST_CHANGES");
-        }
     }
 
     private static String requireText(String value, String field) {
