@@ -1,7 +1,6 @@
-package org.tavall.ai.staging.review;
+package org.tavall.ai.review;
 
 import org.junit.jupiter.api.Test;
-import org.tavall.ai.staging.RepositoryCoordinates;
 
 import java.util.List;
 
@@ -14,11 +13,9 @@ final class RepositoryReviewFunctionsTest {
     void inspectPullRequestReturnsCompleteExactHeadSnapshot() {
         RecordingProvider provider = new RecordingProvider();
         RepositoryReviewFunctions functions = new RepositoryReviewFunctions(new RepositoryReviewService(provider));
-        RepositoryCoordinates repository = RepositoryCoordinates.parse("TavallStudios/example");
+        RepositoryReviewCoordinates repository = RepositoryReviewCoordinates.parse("TavallStudios/example");
 
-        RepositoryReviewSnapshot snapshot = functions.inspectPullRequest(
-                new InspectPullRequestRequest(repository, 17)
-        );
+        RepositoryReviewSnapshot snapshot = functions.inspectPullRequest(new InspectPullRequestRequest(repository, 17));
 
         assertEquals("head-17", snapshot.exactHeadSha());
         assertEquals("base-17", snapshot.baseSha());
@@ -32,7 +29,7 @@ final class RepositoryReviewFunctionsTest {
     void publishRefusesToReviewAHeadThatMovedSinceAnalysis() {
         RecordingProvider provider = new RecordingProvider();
         RepositoryReviewFunctions functions = new RepositoryReviewFunctions(new RepositoryReviewService(provider));
-        RepositoryCoordinates repository = RepositoryCoordinates.parse("TavallStudios/example");
+        RepositoryReviewCoordinates repository = RepositoryReviewCoordinates.parse("TavallStudios/example");
 
         PublishRepositoryReviewRequest request = new PublishRepositoryReviewRequest(
                 repository,
@@ -53,27 +50,20 @@ final class RepositoryReviewFunctionsTest {
         private int publishCount;
 
         @Override
-        public RepositoryReviewSnapshot inspectPullRequest(RepositoryCoordinates repository, int pullRequestNumber) {
+        public RepositoryReviewSnapshot inspectPullRequest(RepositoryReviewCoordinates repository, int pullRequestNumber) {
             lastPullRequestNumber = pullRequestNumber;
-            return new RepositoryReviewSnapshot(
-                    repository,
-                    pullRequestNumber,
-                    "main",
-                    "base-17",
-                    "feature/review-me",
-                    "head-17",
-                    "diff --git a/src/A.java b/src/A.java\n+changed",
-                    List.of("src/A.java", "src/B.java")
-            );
+            return new RepositoryReviewSnapshot(repository, pullRequestNumber, "main", "base-17",
+                    "feature/review-me", "head-17", "diff --git a/src/A.java b/src/A.java\n+changed",
+                    List.of("src/A.java", "src/B.java"));
         }
 
         @Override
-        public RepositoryReviewSnapshot inspectRange(RepositoryCoordinates repository, String base, String head) {
+        public RepositoryReviewSnapshot inspectRange(RepositoryReviewCoordinates repository, String base, String head) {
             return new RepositoryReviewSnapshot(repository, 0, base, "base-sha", head, "head-sha", "diff", List.of());
         }
 
         @Override
-        public List<RepositoryReviewThread> listReviewThreads(RepositoryCoordinates repository, int pullRequestNumber) {
+        public List<RepositoryReviewThread> listReviewThreads(RepositoryReviewCoordinates repository, int pullRequestNumber) {
             return List.of();
         }
 
