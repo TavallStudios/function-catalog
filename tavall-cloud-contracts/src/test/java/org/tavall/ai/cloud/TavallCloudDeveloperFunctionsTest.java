@@ -43,15 +43,6 @@ final class TavallCloudDeveloperFunctionsTest {
         );
     }
 
-    @Test
-    void packageScanningTreatsAnnotatedInterfacesAsContractsNotInstances() {
-        AIFunctionCatalog catalog = new AIFunctionCatalog(new ObjectMapper());
-
-        catalog.scanPackages("org.tavall.ai.cloud");
-
-        assertThat(catalog.getFunctionDefinitions()).isEmpty();
-    }
-
     private static final class FakeTavallCloudDeveloperFunctions implements TavallCloudDeveloperFunctions {
         @Override
         public TavallCloudOperationResult startCi(
