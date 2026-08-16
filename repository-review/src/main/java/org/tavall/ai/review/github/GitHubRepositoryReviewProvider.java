@@ -123,8 +123,8 @@ public final class GitHubRepositoryReviewProvider implements RepositoryReviewPro
         requireAllowed(request.repository());
         ObjectNode payload = objectMapper.createObjectNode()
                 .put("commit_id", request.exactHeadSha())
-                .put("event", event(request.decision()));
-        if (!request.summary().isBlank()) payload.put("body", request.summary());
+                .put("event", event(request.decision()))
+                .put("body", request.summary());
         ArrayNode comments = payload.putArray("comments");
         for (RepositoryReviewComment comment : request.comments()) {
             comments.addObject()
