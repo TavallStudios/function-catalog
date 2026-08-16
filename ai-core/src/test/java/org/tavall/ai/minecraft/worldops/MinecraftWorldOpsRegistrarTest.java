@@ -51,6 +51,8 @@ class MinecraftWorldOpsRegistrarTest {
 
         MinecraftWorldOpsResult typedResult = assertInstanceOf(MinecraftWorldOpsResult.class, result);
         assertTrue(typedResult.success());
+        assertEquals(new MinecraftWorldOpsOperationId("setBlock:1"), typedResult.operationId());
+        assertEquals(MinecraftWorldOpsOperationKind.SET_BLOCK, typedResult.operationKind());
         assertEquals("setBlock", provider.operation());
         MinecraftBlockSetRequest typedRequest = assertInstanceOf(MinecraftBlockSetRequest.class, provider.request());
         assertEquals(new MinecraftWorldRef("kingdom-east"), typedRequest.world());
@@ -68,6 +70,7 @@ class MinecraftWorldOpsRegistrarTest {
         assertEquals(new MinecraftBlockPosition(9, 70, 12), region.max());
         assertThrows(IllegalArgumentException.class, () -> new MinecraftWorldRef("../world; //set lava"));
         assertThrows(IllegalArgumentException.class, () -> new MinecraftBlockState("minecraft:stone; //set lava"));
+        assertThrows(IllegalArgumentException.class, () -> new MinecraftWorldOpsOperationId("  "));
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new MinecraftSchematicRequest(new MinecraftWorldRef("kingdom-east"), "../../escape", "sponge.3"));
