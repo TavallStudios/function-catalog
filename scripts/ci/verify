@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+cd "${repository_root}"
+
+if [[ -n "${TAVALL_CI_EXPECTED_HEAD:-}" ]]; then
+    actual_head="$(git rev-parse HEAD)"
+    if [[ "${actual_head}" != "${TAVALL_CI_EXPECTED_HEAD}" ]]; then
+        printf 'Expected HEAD %s but workspace is %s\n' "${TAVALL_CI_EXPECTED_HEAD}" "${actual_head}" >&2
+        exit 65
+    fi
+fi
+
+java_version="$(java -version 2>&1 | head -n 1)"
+if [[ ! "${java_version}" =~ \"25([.]|\") ]]; then
+    printf 'Java 25 is required. Active runtime: %s\n' "${java_version}" >&2
+    exit 1
+fi
+
+./gradlew --no-daemon clean check publishToMavenLocal stageRuntime
