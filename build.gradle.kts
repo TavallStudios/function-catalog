@@ -92,14 +92,16 @@ project(":ai-core") {
     }
 }
 
-project(":repository-staging") {
-    dependencies {
-        "api"(project(":ai-core"))
-        "api"(jackson)
-        "api"(slf4j)
-        "testImplementation"(junit)
-        "testImplementation"(assertj)
-        "testRuntimeOnly"(junitLauncher)
+for (module in listOf(":repository-staging", ":repository-review")) {
+    project(module) {
+        dependencies {
+            "api"(project(":ai-core"))
+            "api"(jackson)
+            "api"(slf4j)
+            "testImplementation"(junit)
+            "testImplementation"(assertj)
+            "testRuntimeOnly"(junitLauncher)
+        }
     }
 }
 
@@ -156,7 +158,9 @@ project(":mcp-server") {
     dependencies {
         "api"(project(":ai-core"))
         "runtimeOnly"(project(":repository-staging"))
+        "runtimeOnly"(project(":repository-review"))
         "testImplementation"(project(":repository-staging"))
+        "testImplementation"(project(":repository-review"))
         "api"(jackson)
         "api"(slf4j)
         "api"(mcpCore)

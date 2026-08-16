@@ -7,6 +7,7 @@ include(
     "gemini-sdk",
     "ai-core",
     "repository-staging",
+    "repository-review",
     "agent-runtime",
     "codex-agent-provider",
     "openai-sdk",
