@@ -14,7 +14,7 @@ Follow Tavall delegate-style testing.
 - Java tests match production class names plus `Test` and mirror production packages.
 - Code, tests, registration, and direct docs move together as coherent system boundaries.
 - Do not use reflection merely to prove a future class is missing.
-- Do not create separate RED-only contract commits.
+- Do not create separate failure-only/nonexistence contract commits for planned behavior.
 - Run repository-owned local verification only; never GitHub Actions.
 
 ## Task 1: Add typed Minecraft world primitives
