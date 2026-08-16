@@ -41,3 +41,24 @@ AIFunctionInvocationRouter router = new AIFunctionInvocationRouter(catalog, obje
 AIFunctionCall toolCall = new AIFunctionCall("WeatherTools_getWeather", argsJson);
 JsonNode result = router.invokeAsJson(toolCall);
 ```
+
+## Minecraft WorldOps
+
+`org.tavall.ai.minecraft.worldops` provides the bounded typed Function Catalog surface for Minecraft world mutation.
+
+Composition is deliberately one-way:
+
+```text
+MinecraftWorldOpsFunctions
+    -> MinecraftWorldOpsService
+        -> MinecraftWorldOpsProvider
+```
+
+Register a host-scoped provider through the normal catalog registrar path:
+
+```java
+AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+catalog.registerRegistrars(List.of(new MinecraftWorldOpsRegistrar(provider)));
+```
+
+The provider is the only external-runtime boundary. `ai-core` does not depend on Mineflayer, FAWE, Paper, RCON, shell execution, or host credentials. WorldOps exposes typed world, coordinate, region, block-state, clipboard, schematic, and history operations and intentionally provides no generic command function. MCP and agent consumers receive the same canonical names and generated schemas through the existing Function Catalog machinery.
