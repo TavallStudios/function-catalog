@@ -66,6 +66,7 @@ class MinecraftWorldOpsRegistrarTest {
 
         assertEquals(new MinecraftBlockPosition(-2, 64, 3), region.min());
         assertEquals(new MinecraftBlockPosition(9, 70, 12), region.max());
+        assertThrows(IllegalArgumentException.class, () -> new MinecraftWorldRef("../world; //set lava"));
         assertThrows(IllegalArgumentException.class, () -> new MinecraftBlockState("minecraft:stone; //set lava"));
         assertThrows(
                 IllegalArgumentException.class,
