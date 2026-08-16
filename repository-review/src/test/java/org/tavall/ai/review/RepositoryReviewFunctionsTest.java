@@ -45,6 +45,23 @@ final class RepositoryReviewFunctionsTest {
         assertEquals(0, provider.publishCount);
     }
 
+    @Test
+    void approvalRequiresAReviewBody() {
+        RepositoryReviewCoordinates repository = RepositoryReviewCoordinates.parse("TavallStudios/example");
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () ->
+                new PublishRepositoryReviewRequest(
+                        repository,
+                        17,
+                        "head-17",
+                        RepositoryReviewDecision.APPROVE,
+                        "   ",
+                        List.of()
+                ));
+
+        assertEquals("summary must not be blank", error.getMessage());
+    }
+
     private static final class RecordingProvider implements RepositoryReviewProvider {
         private int lastPullRequestNumber;
         private int publishCount;
