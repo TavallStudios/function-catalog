@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.tavall.ai.core.annotation.AISchemaProperty;
 import org.tavall.ai.core.catalog.AIFunctionParameterDefinition;
 
 import java.beans.BeanInfo;
@@ -170,7 +171,10 @@ public final class AIFunctionSchemaGenerator {
         for (RecordComponent component : components) {
             JavaType componentType = objectMapper.getTypeFactory().constructType(component.getGenericType());
             properties.set(component.getName(), createTypeSchema(componentType, activeTypes));
-            required.add(component.getName());
+            AISchemaProperty schemaProperty = component.getAnnotation(AISchemaProperty.class);
+            if (schemaProperty == null || schemaProperty.required()) {
+                required.add(component.getName());
+            }
         }
 
         schema.put("additionalProperties", false);
