@@ -1,10 +1,12 @@
 package org.tavall.ai.minecraft.worldops;
 
+import org.tavall.ai.core.annotation.AISchemaProperty;
+
 import java.util.Objects;
 
 public record MinecraftClipboardPasteRequest(
         MinecraftWorldRef world,
-        MinecraftBlockPosition position,
+        @AISchemaProperty(required = false) MinecraftBlockPosition position,
         boolean atOriginalPosition
 ) {
     public MinecraftClipboardPasteRequest {
