@@ -43,13 +43,8 @@ class AIFunctionMcpToolPublisherTest {
 
         assertThat(tool.outputSchema()).isNotNull();
         assertThat(tool.outputSchema()).containsEntry("type", "object");
-        assertThat(tool.outputSchema()).extractingByKey("properties").isInstanceOfSatisfying(
-                Map.class,
-                properties -> {
-                    assertThat(properties).containsKey("status");
-                    assertThat(properties).containsKey("sequence");
-                }
-        );
+        Map<?, ?> properties = (Map<?, ?>) tool.outputSchema().get("properties");
+        assertThat(properties).containsKeys("status", "sequence");
     }
 
     @Test
