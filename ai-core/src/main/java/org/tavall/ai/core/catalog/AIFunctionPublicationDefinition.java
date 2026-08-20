@@ -20,6 +20,7 @@ public final class AIFunctionPublicationDefinition {
     private final List<AIFunctionPublicationParameterDefinition> parameters;
     private final List<String> requiredParameters;
     private final ObjectNode canonicalParametersSchema;
+    private final ObjectNode canonicalOutputSchema;
     private final String ownerTypeName;
     private final AIFunctionRegistrationSource registrationSource;
     private final boolean enabled;
@@ -36,6 +37,7 @@ public final class AIFunctionPublicationDefinition {
             List<AIFunctionPublicationParameterDefinition> parameters,
             List<String> requiredParameters,
             ObjectNode canonicalParametersSchema,
+            ObjectNode canonicalOutputSchema,
             String ownerTypeName,
             AIFunctionRegistrationSource registrationSource,
             boolean enabled,
@@ -54,6 +56,7 @@ public final class AIFunctionPublicationDefinition {
                 canonicalParametersSchema,
                 "canonicalParametersSchema"
         ).deepCopy();
+        this.canonicalOutputSchema = canonicalOutputSchema == null ? null : canonicalOutputSchema.deepCopy();
         this.ownerTypeName = requireText(ownerTypeName, "ownerTypeName");
         this.registrationSource = Objects.requireNonNull(registrationSource, "registrationSource");
         this.enabled = enabled;
@@ -82,6 +85,7 @@ public final class AIFunctionPublicationDefinition {
                 publishedParameters,
                 safeDefinition.getRequiredParameters(),
                 safeDefinition.getCanonicalParametersSchema(),
+                safeDefinition.getCanonicalOutputSchema(),
                 safeDefinition.getOwnerType().getName(),
                 safeDefinition.getRegistrationSource(),
                 safeDefinition.isEnabled(),
@@ -115,6 +119,10 @@ public final class AIFunctionPublicationDefinition {
 
     public ObjectNode getCanonicalParametersSchema() {
         return canonicalParametersSchema.deepCopy();
+    }
+
+    public ObjectNode getCanonicalOutputSchema() {
+        return canonicalOutputSchema == null ? null : canonicalOutputSchema.deepCopy();
     }
 
     public String getOwnerTypeName() {

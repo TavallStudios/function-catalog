@@ -43,6 +43,13 @@ class AIFunctionCatalogTest {
                         .asText()
         );
 
+        JsonNode outputSchema = catalog.getFunctionDefinitions()
+                .get("WeatherToolService_summarize")
+                .getCanonicalOutputSchema();
+        assertEquals("object", outputSchema.path("type").asText());
+        assertEquals("string", outputSchema.path("properties").path("summary").path("type").asText());
+        assertEquals("integer", outputSchema.path("properties").path("daysRequested").path("type").asText());
+
         ObjectNode arguments = objectMapper.createObjectNode();
         arguments.put("city", "Austin");
         arguments.put("unit", "CELSIUS");

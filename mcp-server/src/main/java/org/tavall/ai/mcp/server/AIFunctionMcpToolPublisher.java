@@ -1,5 +1,6 @@
 package org.tavall.ai.mcp.server;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
@@ -20,6 +21,8 @@ import java.util.function.Predicate;
 
 /** Publishes canonical Function Catalog definitions as MCP tool specifications. */
 public final class AIFunctionMcpToolPublisher {
+    private static final TypeReference<Map<String, Object>> SCHEMA_MAP_TYPE = new TypeReference<>() { };
+
     private final ObjectMapper objectMapper;
 
     public AIFunctionMcpToolPublisher(ObjectMapper objectMapper) {
@@ -50,6 +53,7 @@ public final class AIFunctionMcpToolPublisher {
                     publishedFunctionName,
                     definition.getDescription(),
                     definition.getCanonicalParametersSchema(),
+                    definition.getCanonicalOutputSchema(),
                     arguments -> safeCatalog.invokeResult(publishedFunctionName, arguments)
             ));
         }
@@ -66,6 +70,7 @@ public final class AIFunctionMcpToolPublisher {
                     publishedFunctionName,
                     definition.getDescription(),
                     definition.getCanonicalParametersSchema(),
+                    definition.getCanonicalOutputSchema(),
                     arguments -> safeCatalogView.invokeResult(publishedFunctionName, arguments)
             ));
         }
@@ -76,17 +81,21 @@ public final class AIFunctionMcpToolPublisher {
             String functionName,
             String description,
             JsonNode canonicalParametersSchema,
+            JsonNode canonicalOutputSchema,
             Invocation invocation
     ) {
         McpSchema.JsonSchema inputSchema = objectMapper.convertValue(
                 canonicalParametersSchema,
                 McpSchema.JsonSchema.class
         );
-        McpSchema.Tool tool = McpSchema.Tool.builder()
+        McpSchema.Tool.Builder toolBuilder = McpSchema.Tool.builder()
                 .name(functionName)
                 .description(description)
-                .inputSchema(inputSchema)
-                .build();
+                .inputSchema(inputSchema);
+        if (canonicalOutputSchema != null) {
+            toolBuilder.outputSchema(objectMapper.convertValue(canonicalOutputSchema, SCHEMA_MAP_TYPE));
+        }
+        McpSchema.Tool tool = toolBuilder.build();
         return new SyncToolSpecification(
                 tool,
                 (exchange, request) -> result(invocation.invoke(

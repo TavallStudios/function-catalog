@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.tavall.ai.core.annotation.AISchemaProperty;
 import org.tavall.ai.core.catalog.AIFunctionParameterDefinition;
 
 import java.beans.BeanInfo;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.RecordComponent;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -59,8 +61,12 @@ public final class AIFunctionSchemaGenerator {
         return createTypeSchema(requireValue(type, "type"), new LinkedHashSet<>());
     }
 
-    public ObjectNode generateTypeSchema(Class<?> type) {
+    public ObjectNode generateTypeSchema(Type type) {
         return generateTypeSchema(objectMapper.getTypeFactory().constructType(requireValue(type, "type")));
+    }
+
+    public ObjectNode generateTypeSchema(Class<?> type) {
+        return generateTypeSchema((Type) requireValue(type, "type"));
     }
 
     private ObjectNode createTypeSchema(JavaType javaType, Set<String> activeTypes) {
@@ -70,6 +76,10 @@ public final class AIFunctionSchemaGenerator {
         if (Optional.class.isAssignableFrom(rawClass)) {
             JavaType contentType = safeType.containedTypeCount() > 0 ? safeType.containedType(0) : objectMapper.getTypeFactory().constructType(Object.class);
             return createTypeSchema(contentType, activeTypes);
+        }
+
+        if (void.class.equals(rawClass) || Void.class.equals(rawClass)) {
+            return typeOnlySchema("null");
         }
 
         if (isBooleanType(rawClass)) {
@@ -170,7 +180,10 @@ public final class AIFunctionSchemaGenerator {
         for (RecordComponent component : components) {
             JavaType componentType = objectMapper.getTypeFactory().constructType(component.getGenericType());
             properties.set(component.getName(), createTypeSchema(componentType, activeTypes));
-            required.add(component.getName());
+            AISchemaProperty schemaProperty = component.getAnnotation(AISchemaProperty.class);
+            if (schemaProperty == null || schemaProperty.required()) {
+                required.add(component.getName());
+            }
         }
 
         schema.put("additionalProperties", false);

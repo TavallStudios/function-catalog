@@ -1,7 +1,10 @@
 package org.tavall.ai.core.catalog;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.tavall.ai.core.invocation.AIFunctionOutput;
+import org.tavall.ai.core.schema.AIFunctionSchemaGenerator;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -9,12 +12,16 @@ import java.util.Collections;
 import java.util.List;
 
 public final class AIFunctionDefinition {
+    private static final AIFunctionSchemaGenerator OUTPUT_SCHEMA_GENERATOR =
+            new AIFunctionSchemaGenerator(new ObjectMapper());
+
     private final String name;
     private final String description;
     private final String signature;
     private final List<AIFunctionParameterDefinition> parameters;
     private final List<String> requiredParameters;
     private final ObjectNode canonicalParametersSchema;
+    private final ObjectNode canonicalOutputSchema;
     private final Method method;
     private final Object target;
     private final Class<?> ownerType;
@@ -51,6 +58,7 @@ public final class AIFunctionDefinition {
         this.requiredParameters = Collections.unmodifiableList(new ArrayList<>(requireValue(requiredParameters, "requiredParameters")));
         this.canonicalParametersSchema = requireValue(canonicalParametersSchema, "canonicalParametersSchema").deepCopy();
         this.method = requireValue(method, "method");
+        this.canonicalOutputSchema = canonicalOutputSchema(method);
         this.target = target;
         this.ownerType = requireValue(ownerType, "ownerType");
         this.registrationSource = requireValue(registrationSource, "registrationSource");
@@ -84,6 +92,10 @@ public final class AIFunctionDefinition {
 
     public ObjectNode getCanonicalParametersSchema() {
         return canonicalParametersSchema.deepCopy();
+    }
+
+    public ObjectNode getCanonicalOutputSchema() {
+        return canonicalOutputSchema == null ? null : canonicalOutputSchema.deepCopy();
     }
 
     /** Trusted catalog/runtime API. Capability-scoped views never publish this object. */
@@ -134,6 +146,16 @@ public final class AIFunctionDefinition {
 
     public boolean isStatic() {
         return java.lang.reflect.Modifier.isStatic(method.getModifiers());
+    }
+
+    private static ObjectNode canonicalOutputSchema(Method method) {
+        Class<?> returnType = method.getReturnType();
+        if (void.class.equals(returnType)
+                || Void.class.equals(returnType)
+                || AIFunctionOutput.class.isAssignableFrom(returnType)) {
+            return null;
+        }
+        return OUTPUT_SCHEMA_GENERATOR.generateTypeSchema(method.getGenericReturnType());
     }
 
     private static <T> T requireValue(T value, String fieldName) {
