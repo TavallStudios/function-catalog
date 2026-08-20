@@ -1,5 +1,6 @@
 package org.tavall.ai.minecraft.worldops;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
@@ -8,6 +9,7 @@ import org.tavall.ai.core.catalog.AIFunctionCatalog;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,6 +60,41 @@ class MinecraftWorldOpsRegistrarTest {
         assertEquals(new MinecraftWorldRef("kingdom-east"), typedRequest.world());
         assertEquals(new MinecraftBlockPosition(12, 80, -4), typedRequest.position());
         assertEquals(new MinecraftBlockState("minecraft:stone_bricks"), typedRequest.block());
+    }
+
+    @Test
+    void publishesOriginalPositionPasteWithoutRequiringSyntheticCoordinates() {
+        RecordingMinecraftWorldOpsProvider provider = new RecordingMinecraftWorldOpsProvider();
+        AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+        catalog.registerRegistrars(Set.of(new MinecraftWorldOpsRegistrar(provider)));
+
+        JsonNode requestSchema = catalog.getFunctionDefinitions()
+                .get("minecraft_world_clipboard_paste")
+                .getCanonicalParametersSchema()
+                .path("properties")
+                .path("request");
+
+        assertTrue(requestSchema.path("required").toString().contains("world"));
+        assertTrue(requestSchema.path("required").toString().contains("atOriginalPosition"));
+        assertFalse(requestSchema.path("required").toString().contains("position"));
+        assertEquals("object", requestSchema.path("properties").path("position").path("type").asText());
+
+        ObjectNode arguments = objectMapper.createObjectNode();
+        ObjectNode request = arguments.putObject("request");
+        request.putObject("world").put("value", "kingdom-east");
+        request.put("atOriginalPosition", true);
+
+        MinecraftWorldOpsResult result = assertInstanceOf(
+                MinecraftWorldOpsResult.class,
+                catalog.invoke("minecraft_world_clipboard_paste", arguments)
+        );
+        assertTrue(result.success());
+        MinecraftClipboardPasteRequest typedRequest = assertInstanceOf(
+                MinecraftClipboardPasteRequest.class,
+                provider.request()
+        );
+        assertTrue(typedRequest.atOriginalPosition());
+        assertEquals(null, typedRequest.position());
     }
 
     @Test
