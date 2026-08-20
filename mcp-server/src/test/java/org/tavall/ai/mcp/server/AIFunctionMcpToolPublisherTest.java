@@ -30,6 +30,44 @@ class AIFunctionMcpToolPublisherTest {
     }
 
     @Test
+    void publishesCanonicalOutputSchemaForTypedResults() {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+        catalog.registerInstances(new TestFunctions());
+
+        var tool = new AIFunctionMcpToolPublisher(objectMapper).toolSpecifications(catalog).stream()
+                .map(specification -> specification.tool())
+                .filter(candidate -> candidate.name().equals("chatgpt_status"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(tool.outputSchema()).isNotNull();
+        assertThat(tool.outputSchema()).containsEntry("type", "object");
+        assertThat(tool.outputSchema()).extractingByKey("properties").isInstanceOfSatisfying(
+                Map.class,
+                properties -> {
+                    assertThat(properties).containsKey("status");
+                    assertThat(properties).containsKey("sequence");
+                }
+        );
+    }
+
+    @Test
+    void doesNotPublishFalseStaticOutputSchemaForDynamicRichOutput() {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+        catalog.registerInstances(new TestFunctions());
+
+        var tool = new AIFunctionMcpToolPublisher(objectMapper).toolSpecifications(catalog).stream()
+                .map(specification -> specification.tool())
+                .filter(candidate -> candidate.name().equals("chatgpt_rich"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(tool.outputSchema()).isNull();
+    }
+
+    @Test
     void projectsRichFunctionOutputIntoNativeMcpImageAndResourceContent() {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
@@ -72,8 +110,8 @@ class AIFunctionMcpToolPublisherTest {
 
     private static final class TestFunctions {
         @AIFunction(name = "chatgpt_status", description = "Visible ChatGPT capability")
-        String chatGPTStatus() {
-            return "ok";
+        StatusResult chatGPTStatus() {
+            return new StatusResult("ok", 7);
         }
 
         @AIFunction(name = "chatgpt_rich", description = "Rich ChatGPT capability")
@@ -93,5 +131,8 @@ class AIFunctionMcpToolPublisherTest {
         String internalReconcile() {
             return "ok";
         }
+    }
+
+    private record StatusResult(String status, int sequence) {
     }
 }
