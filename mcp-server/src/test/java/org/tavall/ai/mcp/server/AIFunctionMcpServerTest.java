@@ -42,7 +42,8 @@ class AIFunctionMcpServerTest {
         try (McpSyncClient client = startClient(
                 registrarArgs(stateFile, snapshotFile),
                 Map.of("FUNCTION_CATALOG_NONCE", nonce))) {
-            client.initialize();
+            McpSchema.InitializeResult initialization = client.initialize();
+            assertEquals("2025-11-25", initialization.protocolVersion());
             assertTrue(client.listTools().tools().stream().anyMatch(tool -> "codex_nonce".equals(tool.name())));
 
             McpSchema.CallToolResult result = client.callTool(new McpSchema.CallToolRequest("codex_nonce", Map.of()));

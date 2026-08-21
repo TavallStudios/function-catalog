@@ -147,7 +147,7 @@ project(":mcp-server") {
         "api"(jackson)
         "api"(slf4j)
         "api"(mcpCore)
-        "api"(mcpJackson)
+        "runtimeOnly"(mcpJackson)
         "testImplementation"(junit)
         "testImplementation"(assertj)
         "testRuntimeOnly"(junitLauncher)
