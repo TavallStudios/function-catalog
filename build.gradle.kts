@@ -20,6 +20,7 @@ val mcpJackson = libs.mcp.jackson
 val mockitoCore = libs.mockito.core
 val mockitoJunit = libs.mockito.junit
 val slf4j = libs.slf4j
+val tavallPlatformVersion = "1.0.0"
 
 subprojects {
     group = rootProject.group
@@ -32,8 +33,36 @@ subprojects {
         withSourcesJar()
         withJavadocJar()
     }
-    repositories { mavenCentral() }
+    repositories {
+        mavenCentral()
+        val githubToken = providers.environmentVariable("GITHUB_TOKEN").orNull
+        if (!githubToken.isNullOrBlank()) {
+            listOf(
+                "tavall-di",
+                "tavall-registry",
+                "tavall-reflection",
+                "tavall-concurrency",
+                "tavall-logging",
+                "tavall-eventbus",
+                "tavall-cache",
+                "tavall-scheduler",
+                "tavall-database",
+            ).forEach { repository ->
+                maven("https://maven.pkg.github.com/TavallStudios/$repository") {
+                    name = "github${repository.replace("-", "")}"
+                    credentials {
+                        username = providers.environmentVariable("GITHUB_ACTOR").orElse("github").get()
+                        password = githubToken
+                    }
+                }
+            }
+        }
+    }
     dependencyLocking { lockAllConfigurations() }
+    dependencies {
+        // Tavall DI is the baseline first-party composition layer for every Tavall-owned Java consumer module.
+        "implementation"("org.tavall:tavall-di:$tavallPlatformVersion")
+    }
     tasks.withType<JavaCompile>().configureEach { options.compilerArgs.add("-parameters") }
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
@@ -84,8 +113,13 @@ subprojects {
 project(":ai-core") {
     dependencies {
         "api"(jackson)
+        // ClassGraph/SLF4J remain transitional while scanning/logging migrate to Tavall Reflection/Logging.
         "api"(slf4j)
         "api"(classgraph)
+        "implementation"("org.tavall:tavall-registry:$tavallPlatformVersion")
+        "implementation"("org.tavall:tavall-reflection:$tavallPlatformVersion")
+        "implementation"("org.tavall:tavall-concurrency:$tavallPlatformVersion")
+        "implementation"("org.tavall:tavall-logging:$tavallPlatformVersion")
         "testImplementation"(junit)
         "testImplementation"(assertj)
         "testRuntimeOnly"(junitLauncher)
@@ -148,6 +182,8 @@ project(":mcp-server") {
         "api"(slf4j)
         "api"(mcpCore)
         "api"(mcpJackson)
+        "implementation"("org.tavall:tavall-logging:$tavallPlatformVersion")
+        "implementation"("org.tavall:tavall-concurrency:$tavallPlatformVersion")
         "testImplementation"(junit)
         "testImplementation"(assertj)
         "testRuntimeOnly"(junitLauncher)
