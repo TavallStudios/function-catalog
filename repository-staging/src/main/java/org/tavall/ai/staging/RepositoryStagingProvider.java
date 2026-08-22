@@ -13,6 +13,11 @@ public interface RepositoryStagingProvider {
         return this;
     }
 
+    /** Returns the exact execution evidence for the current scoped provider, when available. */
+    default Optional<StagingExecutionEvidence> executionEvidence() {
+        return Optional.empty();
+    }
+
     List<RepositoryPullRequest> listOpenPullRequests(RepositoryCoordinates repository);
     Optional<String> branchHead(RepositoryCoordinates repository, String branch);
     void createBranch(RepositoryCoordinates repository, String branch, String sha);

@@ -124,7 +124,13 @@ public final class RepositoryStagingService {
         }
 
         detectCycles(relationships, findings);
-        return new StagingGraph(pulls, staging, relationships, findings);
+        return new StagingGraph(
+                pulls,
+                staging,
+                relationships,
+                findings,
+                provider.executionEvidence().orElse(null)
+        );
     }
 
     public StagingBaseResolution resolveBase(ResolveStagingBaseRequest request) {
