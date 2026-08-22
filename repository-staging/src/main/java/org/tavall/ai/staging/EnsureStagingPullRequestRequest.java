@@ -5,8 +5,19 @@ public record EnsureStagingPullRequestRequest(
         StagingType type,
         String title,
         String branch,
-        String parentBranch
+        String parentBranch,
+        StagingExecutionContext context
 ) {
+    public EnsureStagingPullRequestRequest(
+            RepositoryCoordinates repository,
+            StagingType type,
+            String title,
+            String branch,
+            String parentBranch
+    ) {
+        this(repository, type, title, branch, parentBranch, null);
+    }
+
     public EnsureStagingPullRequestRequest {
         if (repository == null || type == null) throw new IllegalArgumentException("repository/type must not be null");
         title = text(title, "title");
