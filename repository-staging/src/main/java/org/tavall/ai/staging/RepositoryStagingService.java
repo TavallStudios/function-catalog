@@ -22,6 +22,11 @@ public final class RepositoryStagingService {
         this.provider = Objects.requireNonNull(provider, "provider");
     }
 
+    /** Returns a semantic service view bound to the supplied execution fence. */
+    public RepositoryStagingService scoped(StagingExecutionContext context) {
+        return new RepositoryStagingService(provider.scoped(context));
+    }
+
     public StagingDiscoveryResult discover(RepositoryStagingRequest request) {
         StagingGraph graph = inspectGraph(request);
         return new StagingDiscoveryResult(graph.stagingPullRequests(), graph.findings());
@@ -119,7 +124,13 @@ public final class RepositoryStagingService {
         }
 
         detectCycles(relationships, findings);
-        return new StagingGraph(pulls, staging, relationships, findings);
+        return new StagingGraph(
+                pulls,
+                staging,
+                relationships,
+                findings,
+                provider.executionEvidence().orElse(null)
+        );
     }
 
     public StagingBaseResolution resolveBase(ResolveStagingBaseRequest request) {
