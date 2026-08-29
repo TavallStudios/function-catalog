@@ -90,14 +90,14 @@ public final class RepositoryStagingService {
 
         Map<String, List<StagingPullRequest>> activeGroups = staging.stream()
                 .filter(value -> value.metadata().state() == StagingState.ACTIVE)
-                .collect(Collectors.groupingBy(value -> value.metadata().type() + "|" + value.metadata().parent()));
+                .collect(Collectors.groupingBy(RepositoryStagingService::activeRootIdentity));
         for (Map.Entry<String, List<StagingPullRequest>> entry : activeGroups.entrySet()) {
             if (entry.getValue().size() > 1) {
                 for (StagingPullRequest duplicate : entry.getValue()) {
                     findings.add(finding(
                             "DUPLICATE_ACTIVE_STAGING_ROOT",
                             StagingFindingSeverity.ERROR,
-                            "Multiple active staging roots share type/parent " + entry.getKey(),
+                            "Multiple active staging roots share identity " + entry.getKey(),
                             duplicate.pullRequest().number()
                     ));
                 }
@@ -131,6 +131,14 @@ public final class RepositoryStagingService {
                 findings,
                 provider.executionEvidence().orElse(null)
         );
+    }
+
+    private static String activeRootIdentity(StagingPullRequest value) {
+        StagingMetadata metadata = value.metadata();
+        if (metadata.type() == StagingType.DOMAIN_INTEGRATION) {
+            return metadata.type() + "|" + metadata.branch();
+        }
+        return metadata.type() + "|" + metadata.parent();
     }
 
     public StagingBaseResolution resolveBase(ResolveStagingBaseRequest request) {
