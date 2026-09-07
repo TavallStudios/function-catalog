@@ -104,24 +104,7 @@ public final class RepositoryStagingService {
             }
         }
 
-        boolean activeRepositoryStaging = staging.stream().anyMatch(value ->
-                value.metadata().type() == StagingType.REPOSITORY_INTEGRATION
-                        && value.metadata().state() == StagingState.ACTIVE);
-        Set<Integer> stagingNumbers = staging.stream()
-                .map(value -> value.pullRequest().number())
-                .collect(Collectors.toSet());
-        if (activeRepositoryStaging) {
-            for (RepositoryPullRequest pull : pulls) {
-                if (!stagingNumbers.contains(pull.number()) && "main".equals(pull.baseBranch())) {
-                    findings.add(finding(
-                            "DIRECT_TO_MAIN_WITH_ACTIVE_STAGING",
-                            StagingFindingSeverity.WARNING,
-                            "Non-staging pull request targets main while active repository staging exists; confirm intentional hotfix or reattach/reconcile it into staging",
-                            pull.number()
-                    ));
-                }
-            }
-        }
+        validateMandatoryAncestry(pulls, byHead, staging, findings);
 
         detectCycles(relationships, findings);
         return new StagingGraph(
@@ -139,6 +122,115 @@ public final class RepositoryStagingService {
             return metadata.type() + "|" + metadata.branch();
         }
         return metadata.type() + "|" + metadata.parent();
+    }
+
+    /**
+     * Enforces the repository integration invariant for every open normal PR
+     * and every active sub-staging PR. A path is valid only when it reaches a
+     * live staging root; a feature stack cannot be treated as integrated merely
+     * because one of its branches happens to exist locally.
+     */
+    private static void validateMandatoryAncestry(
+            List<RepositoryPullRequest> pulls,
+            Map<String, RepositoryPullRequest> byHead,
+            List<StagingPullRequest> staging,
+            List<StagingTopologyFinding> findings
+    ) {
+        Map<Integer, StagingPullRequest> stagingByNumber = staging.stream()
+                .collect(Collectors.toMap(
+                        value -> value.pullRequest().number(),
+                        Function.identity(),
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+        Map<Integer, Boolean> memo = new HashMap<>();
+        Set<Integer> visiting = new HashSet<>();
+        boolean activeStagingPresent = staging.stream()
+                .anyMatch(value -> value.metadata().state() != StagingState.SUPERSEDED);
+        for (RepositoryPullRequest pull : pulls) {
+            if (hasLiveStagingPath(
+                    pull, byHead, stagingByNumber, memo, visiting, findings, activeStagingPresent
+            )) {
+                continue;
+            }
+            if (stagingByNumber.containsKey(pull.number())) {
+                continue;
+            }
+            findings.add(finding(
+                    "PR_WITHOUT_STAGING_ANCESTRY",
+                    StagingFindingSeverity.ERROR,
+                    "Open normal pull request has no valid transitive path into an active Sub-Staging or Staging pull request",
+                    pull.number()
+            ));
+        }
+    }
+
+    private static boolean hasLiveStagingPath(
+            RepositoryPullRequest pull,
+            Map<String, RepositoryPullRequest> byHead,
+            Map<Integer, StagingPullRequest> stagingByNumber,
+            Map<Integer, Boolean> memo,
+            Set<Integer> visiting,
+            List<StagingTopologyFinding> findings,
+            boolean activeStagingPresent
+    ) {
+        Boolean known = memo.get(pull.number());
+        if (known != null) {
+            return known;
+        }
+        if (!visiting.add(pull.number())) {
+            memo.put(pull.number(), false);
+            return false;
+        }
+
+        StagingPullRequest staging = stagingByNumber.get(pull.number());
+        boolean valid;
+        if (staging != null && staging.metadata().state() == StagingState.SUPERSEDED) {
+            // Superseded integration records are retained for history, but do
+            // not count as active ancestry and do not themselves need repair.
+            valid = false;
+        } else if (staging != null) {
+            StagingType type = staging.metadata().type();
+            if ("main".equals(pull.baseBranch())
+                    && (type == StagingType.REPOSITORY_INTEGRATION || type == StagingType.RELEASE_INTEGRATION)) {
+                valid = true;
+            } else {
+                RepositoryPullRequest parent = byHead.get(pull.baseBranch());
+                if (parent == null) {
+                    findings.add(finding(
+                            type == StagingType.DOMAIN_INTEGRATION
+                                    ? "SUB_STAGING_WITHOUT_ACTIVE_PARENT"
+                                    : "STAGING_PARENT_NOT_OPEN",
+                            StagingFindingSeverity.ERROR,
+                            "Live staging pull request does not have an open parent staging path",
+                            pull.number()
+                    ));
+                    valid = false;
+                } else {
+                    valid = hasLiveStagingPath(
+                            parent, byHead, stagingByNumber, memo, visiting, findings, activeStagingPresent
+                    );
+                }
+            }
+        } else {
+            RepositoryPullRequest parent = byHead.get(pull.baseBranch());
+            valid = parent != null
+                    && hasLiveStagingPath(
+                    parent, byHead, stagingByNumber, memo, visiting, findings, activeStagingPresent
+            );
+            if (!valid && activeStagingPresent && "main".equals(pull.baseBranch())) {
+                findings.add(finding(
+                        "DIRECT_TO_MAIN_WITH_ACTIVE_STAGING",
+                        StagingFindingSeverity.ERROR,
+                        "Open normal pull request targets main without a staging ancestry path",
+                        pull.number()
+                ));
+            }
+        }
+
+        visiting.remove(pull.number());
+        memo.put(pull.number(), valid);
+        return valid;
     }
 
     public StagingBaseResolution resolveBase(ResolveStagingBaseRequest request) {
@@ -237,6 +329,11 @@ public final class RepositoryStagingService {
                 .filter(value -> value.metadata().branch().equals(request.branch()))
                 .findFirst();
         if (existing.isPresent()) {
+            if (!existing.get().metadata().parent().equals(request.parentBranch())) {
+                throw new IllegalStateException(
+                        "Staging branch already exists with a different parent: " + existing.get().metadata().parent()
+                );
+            }
             return new StagingEnsureResult(false, existing.get());
         }
 
@@ -283,8 +380,11 @@ public final class RepositoryStagingService {
                 .filter(value -> value.pullRequest().number() == request.stagingPullRequestNumber())
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Target is not a staging pull request"));
-        if (target.metadata().state() == StagingState.SUPERSEDED) {
-            throw new IllegalStateException("Cannot attach to a superseded staging pull request");
+        if (source.number() == target.pullRequest().number()) {
+            throw new IllegalArgumentException("A staging pull request cannot attach to itself");
+        }
+        if (target.metadata().state() != StagingState.ACTIVE) {
+            throw new IllegalStateException("Only an ACTIVE staging pull request accepts new attachments");
         }
 
         RepositoryPullRequest currentParent = byHead.get(source.baseBranch());
@@ -298,11 +398,32 @@ public final class RepositoryStagingService {
             }
         }
 
+        if (isDescendant(target.pullRequest(), source, byHead)) {
+            throw new IllegalStateException("Attaching would create a pull-request ancestry cycle");
+        }
+
+        Optional<String> updatedBody = Optional.empty();
+        StagingMetadataDocument sourceDocument = StagingMetadataDocument.parse(source.body());
+        if (sourceDocument.malformed()) {
+            throw new IllegalStateException("Cannot attach a pull request with malformed staging metadata");
+        }
+        if (sourceDocument.metadata().isPresent()) {
+            StagingMetadata metadata = sourceDocument.metadata().get();
+            updatedBody = Optional.of(sourceDocument.replace(new StagingMetadata(
+                    metadata.type(),
+                    metadata.state(),
+                    metadata.branch(),
+                    target.metadata().branch(),
+                    metadata.promotion(),
+                    metadata.childMergeTarget()
+            )));
+        }
+
         provider.updatePullRequest(
                 request.repository(),
                 source.number(),
                 Optional.of(target.metadata().branch()),
-                Optional.empty()
+                updatedBody
         );
         return new StagingAttachResult(
                 true,
@@ -325,6 +446,15 @@ public final class RepositoryStagingService {
             throw new IllegalStateException(
                     "Invalid staging state transition: " + previous + " -> " + request.state()
             );
+        }
+        if (request.state() == StagingState.SUPERSEDED) {
+            boolean hasChildren = graph.pullRequests().stream()
+                    .anyMatch(value -> value.baseBranch().equals(staging.pullRequest().headBranch()));
+            if (hasChildren) {
+                throw new IllegalStateException(
+                        "Cannot supersede a staging pull request while open descendants still target it"
+                );
+            }
         }
 
         String body = StagingMetadataDocument.parse(staging.pullRequest().body()).withState(request.state());
@@ -431,6 +561,26 @@ public final class RepositoryStagingService {
     private static boolean successfulConclusion(String conclusion) {
         String normalized = conclusion == null ? "" : conclusion.trim().toUpperCase();
         return Set.of("SUCCESS", "NEUTRAL", "SKIPPED").contains(normalized);
+    }
+
+    private static boolean isDescendant(
+            RepositoryPullRequest candidate,
+            RepositoryPullRequest possibleAncestor,
+            Map<String, RepositoryPullRequest> byHead
+    ) {
+        Set<String> visitedBranches = new HashSet<>();
+        String branch = candidate.baseBranch();
+        while (branch != null && visitedBranches.add(branch)) {
+            if (branch.equals(possibleAncestor.headBranch())) {
+                return true;
+            }
+            RepositoryPullRequest parent = byHead.get(branch);
+            if (parent == null) {
+                return false;
+            }
+            branch = parent.baseBranch();
+        }
+        return false;
     }
 
     private static StagingTopologyFinding finding(

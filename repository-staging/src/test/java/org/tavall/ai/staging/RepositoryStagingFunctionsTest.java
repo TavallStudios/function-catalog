@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RepositoryStagingFunctionsTest {
     @Test
@@ -80,7 +81,7 @@ class RepositoryStagingFunctionsTest {
     }
 
     @Test
-    void validateWarnsAboutDirectToMainWorkWithoutMakingIntentionalHotfixTopologyInvalid() {
+    void validateRejectsDirectToMainWorkWithoutStagingAncestry() {
         RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
         FakeProvider provider = new FakeProvider(List.of(
                 pull(10, "Runtime: Staging PR — Example", "staging/runtime", "main", stagingBody()),
@@ -90,12 +91,48 @@ class RepositoryStagingFunctionsTest {
         StagingValidationResult result = new RepositoryStagingService(provider)
                 .validate(new RepositoryStagingRequest(repository));
 
-        assertThat(result.valid()).isTrue();
+        assertThat(result.valid()).isFalse();
         assertThat(result.findings())
                 .filteredOn(finding -> finding.code().equals("DIRECT_TO_MAIN_WITH_ACTIVE_STAGING"))
                 .singleElement()
                 .extracting(StagingTopologyFinding::severity)
-                .isEqualTo(StagingFindingSeverity.WARNING);
+                .isEqualTo(StagingFindingSeverity.ERROR);
+    }
+
+    @Test
+    void validateRejectsAStackWhoseRootHasNoStagingPath() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(40, "stack root", "working/root", "main", "feature"),
+                pull(41, "stack child", "working/child", "working/root", "feature")
+        ));
+
+        StagingValidationResult result = new RepositoryStagingService(provider)
+                .validate(new RepositoryStagingRequest(repository));
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.findings())
+                .filteredOn(finding -> finding.code().equals("PR_WITHOUT_STAGING_ANCESTRY"))
+                .extracting(StagingTopologyFinding::pullRequestNumber)
+                .containsExactlyInAnyOrder(40, 41);
+    }
+
+    @Test
+    void validateRejectsAnOrphanSubStagingPullRequest() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(70, "Domain staging", "staging/domain", "main", domainStagingBody())
+        ));
+
+        StagingValidationResult result = new RepositoryStagingService(provider)
+                .validate(new RepositoryStagingRequest(repository));
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.findings())
+                .filteredOn(finding -> finding.code().equals("SUB_STAGING_WITHOUT_ACTIVE_PARENT"))
+                .singleElement()
+                .extracting(StagingTopologyFinding::severity)
+                .isEqualTo(StagingFindingSeverity.ERROR);
     }
 
     @Test
@@ -113,6 +150,50 @@ class RepositoryStagingFunctionsTest {
         assertThat(result.attached()).isTrue();
         assertThat(provider.pullRequests.get(40).baseBranch()).isEqualTo("staging/runtime");
         assertThat(provider.pullRequests.get(41).baseBranch()).isEqualTo("working/root");
+    }
+
+    @Test
+    void attachRejectsFrozenTargets() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(10, "Frozen staging", "staging/runtime", "main", frozenStagingBody()),
+                pull(40, "stack root", "working/root", "main", "feature")
+        ));
+
+        assertThatThrownBy(() -> new RepositoryStagingService(provider)
+                .attach(new AttachStagingPullRequestRequest(repository, 40, 10)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ACTIVE");
+    }
+
+    @Test
+    void attachRewritesStagingMetadataParentAlongsidePullRequestBase() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(10, "Runtime staging", "staging/runtime", "main", stagingBody()),
+                pull(40, "Domain staging", "staging/domain", "main", domainStagingBody())
+        ));
+
+        StagingAttachResult result = new RepositoryStagingService(provider)
+                .attach(new AttachStagingPullRequestRequest(repository, 40, 10));
+
+        assertThat(result.attached()).isTrue();
+        assertThat(provider.pullRequests.get(40).baseBranch()).isEqualTo("staging/runtime");
+        assertThat(provider.pullRequests.get(40).body()).contains("Parent: staging/runtime");
+    }
+
+    @Test
+    void supersedingAStagingPullRequestWithOpenDescendantsIsRejected() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(10, "Runtime staging", "staging/runtime", "main", stagingBody()),
+                pull(40, "attached root", "working/root", "staging/runtime", "feature")
+        ));
+
+        assertThatThrownBy(() -> new RepositoryStagingService(provider)
+                .setState(new SetStagingStateRequest(repository, 10, StagingState.SUPERSEDED)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("open descendants");
     }
 
     @Test
@@ -142,6 +223,11 @@ class RepositoryStagingFunctionsTest {
 
     private static String frozenStagingBody() {
         return stagingBody().replace("State: ACTIVE", "State: FROZEN");
+    }
+
+    private static String domainStagingBody() {
+        return "<!-- tavall-staging:v1 -->\nType: DOMAIN_INTEGRATION\nState: ACTIVE\n"
+                + "Branch: staging/domain\nParent: main\nPromotion: MANUAL\nChildMergeTarget: staging/domain\n";
     }
 
     private static final class FakeProvider implements RepositoryStagingProvider {
