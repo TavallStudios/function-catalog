@@ -34,6 +34,10 @@ public final class RepositoryStagingService {
 
     public StagingGraph inspectGraph(RepositoryStagingRequest request) {
         List<RepositoryPullRequest> pulls = provider.listOpenPullRequests(request.repository());
+        return inspectGraph(pulls);
+    }
+
+    private StagingGraph inspectGraph(List<RepositoryPullRequest> pulls) {
         Map<String, RepositoryPullRequest> byHead = pulls.stream().collect(Collectors.toMap(
                 RepositoryPullRequest::headBranch,
                 Function.identity(),
@@ -319,6 +323,75 @@ public final class RepositoryStagingService {
         List<StagingTopologyFinding> findings = inspectGraph(request).findings();
         boolean valid = findings.stream().noneMatch(value -> value.severity() == StagingFindingSeverity.ERROR);
         return new StagingValidationResult(valid, findings);
+    }
+
+    public RepositoryPullRequest createPullRequest(CreateStagedPullRequestRequest request) {
+        List<RepositoryPullRequest> pulls = provider.listOpenPullRequests(request.repository());
+        if (pulls.stream().anyMatch(pull -> pull.headBranch().equals(request.headBranch()))) {
+            throw new IllegalStateException("An open pull request already owns the requested head branch");
+        }
+        requireHead(request.expectedHeadSha(), provider.branchHead(request.repository(), request.headBranch()).orElse(""));
+        int candidateNumber = Math.addExact(pulls.stream().mapToInt(RepositoryPullRequest::number).max().orElse(0), 1);
+        var candidate = new RepositoryPullRequest(candidateNumber, request.title(), request.body(),
+                request.headBranch(), request.expectedHeadSha(), request.baseBranch(),
+                provider.branchHead(request.repository(), request.baseBranch()).orElseThrow(
+                        () -> new IllegalStateException("Requested base branch does not exist")), request.draft());
+        List<RepositoryPullRequest> proposed = new ArrayList<>(pulls);
+        proposed.add(candidate);
+        requireValidGraph(proposed);
+        RepositoryPullRequest created = provider.createPullRequest(request.repository(), request.title(),
+                request.headBranch(), request.baseBranch(), request.body(), request.draft());
+        verifyPublishedMutation(request.repository(), created, candidate);
+        return created;
+    }
+
+    public RepositoryPullRequest updatePullRequest(UpdateStagedPullRequestRequest request) {
+        List<RepositoryPullRequest> pulls = provider.listOpenPullRequests(request.repository());
+        RepositoryPullRequest current = pulls.stream().filter(pull -> pull.number() == request.pullRequestNumber())
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("Pull request is not open"));
+        requireHead(request.expectedHeadSha(), current.headSha());
+        if (request.baseBranch().isPresent() && !request.baseBranch().get().equals(current.baseBranch())) {
+            pulls.stream().filter(pull -> pull.headBranch().equals(current.baseBranch())).findFirst().ifPresent(parent -> {
+                if (StagingMetadataDocument.parse(parent.body()).metadata().isEmpty()) {
+                    throw new IllegalStateException("Preserve the open feature dependency; reparent its stack root instead");
+                }
+            });
+        }
+        var candidate = new RepositoryPullRequest(current.number(), current.title(), request.body().orElse(current.body()),
+                current.headBranch(), current.headSha(), request.baseBranch().orElse(current.baseBranch()),
+                current.baseSha(), current.draft());
+        requireValidGraph(pulls.stream().map(pull -> pull.number() == current.number() ? candidate : pull).toList());
+        RepositoryPullRequest updated = provider.updatePullRequest(request.repository(), current.number(),
+                request.baseBranch(), request.body());
+        verifyPublishedMutation(request.repository(), updated, candidate);
+        return updated;
+    }
+
+    private void verifyPublishedMutation(RepositoryCoordinates repository, RepositoryPullRequest changed, RepositoryPullRequest expected) {
+        try {
+            List<RepositoryPullRequest> observed = provider.listOpenPullRequests(repository);
+            RepositoryPullRequest stored = observed.stream().filter(pull -> pull.number() == changed.number())
+                    .findFirst().orElseThrow(() -> new IllegalStateException("Published pull request is not open"));
+            requireHead(expected.headSha(), stored.headSha());
+            if (!expected.headBranch().equals(stored.headBranch()) || !expected.baseBranch().equals(stored.baseBranch())
+                    || !expected.body().equals(stored.body())) {
+                throw new IllegalStateException("Published pull request differs from the validated mutation");
+            }
+            requireValidGraph(observed);
+        } catch (RuntimeException failure) {
+            throw new IllegalStateException("RECOVERY_REQUIRED: published PR #" + changed.number()
+                    + " requires topology reconciliation before the workflow can succeed", failure);
+        }
+    }
+
+    private void requireValidGraph(List<RepositoryPullRequest> pulls) {
+        List<StagingTopologyFinding> errors = inspectGraph(pulls).findings().stream()
+                .filter(finding -> finding.severity() == StagingFindingSeverity.ERROR).toList();
+        if (!errors.isEmpty()) throw new IllegalStateException("Invalid staging topology: " + errors);
+    }
+
+    private static void requireHead(String expected, String actual) {
+        if (!expected.equals(actual)) throw new IllegalStateException("STALE_SOURCE: pull request head changed");
     }
 
     public StagingEnsureResult ensure(EnsureStagingPullRequestRequest request) {
