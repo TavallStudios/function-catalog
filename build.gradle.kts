@@ -21,6 +21,7 @@ val mcpJackson2 = libs.mcp.jackson2
 val mockitoCore = libs.mockito.core
 val mockitoJunit = libs.mockito.junit
 val slf4j = libs.slf4j
+val tomcatEmbedCore = libs.tomcat.embed.core
 
 subprojects {
     group = rootProject.group
@@ -120,6 +121,7 @@ project(":strands-agent-provider") {
         "api"(project(":agent-runtime"))
         "api"(jackson)
         "api"(slf4j)
+        "implementation"(project(":mcp-server"))
         "implementation"(mcpCore)
         "implementation"(mcpJackson2)
         "testImplementation"(junit)
@@ -162,6 +164,7 @@ project(":mcp-server") {
         "api"(slf4j)
         "api"(mcpCore)
         "api"(mcpJackson)
+        "implementation"(tomcatEmbedCore)
         "testImplementation"(junit)
         "testImplementation"(assertj)
         "testRuntimeOnly"(junitLauncher)
