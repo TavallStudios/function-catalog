@@ -20,4 +20,17 @@ jobs:
           distribution: temurin
           java-version: "25"
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew --no-daemon clean check publishToMavenLocal stageRuntime
+
+      - name: Generate migration dependency locks
+        run: ./gradlew --no-daemon dependencies --write-locks
+
+      - name: Validate Function Catalog
+        run: ./gradlew --no-daemon clean check publishToMavenLocal stageRuntime
+
+      - name: Upload generated lock state
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-gradle-locks
+          path: "**/gradle.lockfile"
+          if-no-files-found: error
