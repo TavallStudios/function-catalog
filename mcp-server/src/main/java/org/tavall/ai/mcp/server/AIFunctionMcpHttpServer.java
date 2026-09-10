@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -25,9 +26,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * the view, copies application behavior, or publishes functions outside that view.</p>
  */
 public final class AIFunctionMcpHttpServer implements AutoCloseable {
-    private static final String ENDPOINT = "/mcp";
-
     private final Path baseDirectory;
+    private final String endpoint;
     private final Tomcat tomcat;
     private final McpSyncServer mcpServer;
     private final HttpServletStreamableServerTransportProvider transportProvider;
@@ -35,19 +35,22 @@ public final class AIFunctionMcpHttpServer implements AutoCloseable {
 
     private AIFunctionMcpHttpServer(
             Path baseDirectory,
+            String endpoint,
             Tomcat tomcat,
             McpSyncServer mcpServer,
             HttpServletStreamableServerTransportProvider transportProvider
     ) {
         this.baseDirectory = Objects.requireNonNull(baseDirectory, "baseDirectory");
+        this.endpoint = Objects.requireNonNull(endpoint, "endpoint");
         this.tomcat = Objects.requireNonNull(tomcat, "tomcat");
         this.mcpServer = Objects.requireNonNull(mcpServer, "mcpServer");
         this.transportProvider = Objects.requireNonNull(transportProvider, "transportProvider");
     }
 
-    /** Starts a loopback server on an ephemeral port for the supplied authorized view. */
+    /** Starts a loopback server on an ephemeral port and unguessable endpoint for the supplied authorized view. */
     public static AIFunctionMcpHttpServer start(AIFunctionCatalogView catalogView) {
         AIFunctionCatalogView safeCatalogView = Objects.requireNonNull(catalogView, "catalogView");
+        String endpoint = "/mcp/" + UUID.randomUUID();
         ObjectMapper objectMapper = new ObjectMapper();
         McpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
         AIFunctionMcpToolPublisher publisher = new AIFunctionMcpToolPublisher(objectMapper);
@@ -55,7 +58,7 @@ public final class AIFunctionMcpHttpServer implements AutoCloseable {
         HttpServletStreamableServerTransportProvider transportProvider =
                 HttpServletStreamableServerTransportProvider.builder()
                         .jsonMapper(jsonMapper)
-                        .mcpEndpoint(ENDPOINT)
+                        .mcpEndpoint(endpoint)
                         .build();
 
         McpSyncServer mcpServer = McpServer.sync(transportProvider)
@@ -74,12 +77,12 @@ public final class AIFunctionMcpHttpServer implements AutoCloseable {
 
         Context context = tomcat.addContext("", baseDirectory.toAbsolutePath().toString());
         Tomcat.addServlet(context, "tavallFunctionCatalogMcp", transportProvider);
-        context.addServletMappingDecoded(ENDPOINT, "tavallFunctionCatalogMcp");
-        context.addServletMappingDecoded(ENDPOINT + "/*", "tavallFunctionCatalogMcp");
+        context.addServletMappingDecoded(endpoint, "tavallFunctionCatalogMcp");
+        context.addServletMappingDecoded(endpoint + "/*", "tavallFunctionCatalogMcp");
 
         try {
             tomcat.start();
-            return new AIFunctionMcpHttpServer(baseDirectory, tomcat, mcpServer, transportProvider);
+            return new AIFunctionMcpHttpServer(baseDirectory, endpoint, tomcat, mcpServer, transportProvider);
         } catch (Exception exception) {
             closeFailedStart(mcpServer, transportProvider, tomcat, baseDirectory);
             throw new IllegalStateException("Failed to start loopback Function Catalog MCP server.", exception);
@@ -91,7 +94,7 @@ public final class AIFunctionMcpHttpServer implements AutoCloseable {
         if (localPort <= 0) {
             throw new IllegalStateException("Function Catalog MCP server is not listening.");
         }
-        return URI.create("http://127.0.0.1:" + localPort + ENDPOINT);
+        return URI.create("http://127.0.0.1:" + localPort + endpoint);
     }
 
     @Override
