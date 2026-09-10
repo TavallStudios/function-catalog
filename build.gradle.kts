@@ -17,6 +17,7 @@ val junit = libs.junit
 val junitLauncher = libs.junit.launcher
 val mcpCore = libs.mcp.core
 val mcpJackson = libs.mcp.jackson
+val mcpJackson2 = libs.mcp.jackson2
 val mockitoCore = libs.mockito.core
 val mockitoJunit = libs.mockito.junit
 val slf4j = libs.slf4j
@@ -108,6 +109,19 @@ project(":codex-agent-provider") {
         "api"(project(":agent-runtime"))
         "api"(jackson)
         "api"(slf4j)
+        "testImplementation"(junit)
+        "testImplementation"(assertj)
+        "testRuntimeOnly"(junitLauncher)
+    }
+}
+
+project(":strands-agent-provider") {
+    dependencies {
+        "api"(project(":agent-runtime"))
+        "api"(jackson)
+        "api"(slf4j)
+        "implementation"(mcpCore)
+        "implementation"(mcpJackson2)
         "testImplementation"(junit)
         "testImplementation"(assertj)
         "testRuntimeOnly"(junitLauncher)
