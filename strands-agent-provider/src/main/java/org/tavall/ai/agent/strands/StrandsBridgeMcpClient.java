@@ -5,8 +5,11 @@ import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.client.transport.ServerParameters;
 import io.modelcontextprotocol.client.transport.StdioClientTransport;
+import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.json.jackson2.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.spec.McpSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -16,6 +19,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Lifecycle owner for the Java -> standalone Strands MCP connection. */
 public final class StrandsBridgeMcpClient implements AutoCloseable {
     public static final String INVOKE_ONCE_TOOL = "strands_agent_invoke_once";
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(StrandsBridgeMcpClient.class);
 
     private final StrandsAgentProviderConfiguration configuration;
     private final ObjectMapper objectMapper;
@@ -76,11 +81,13 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
                     .args(configuration.arguments())
                     .env(configuration.environment())
                     .build();
-            StdioClientTransport transport = new StdioClientTransport(
+            McpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
+            StdioClientTransport transport = new IsolatedStdioClientTransport(
                     serverParameters,
-                    new JacksonMcpJsonMapper(objectMapper)
+                    jsonMapper,
+                    configuration.environment()
             );
-            transport.setStdErrorHandler(message -> System.err.println("[strands-bridge] " + message));
+            transport.setStdErrorHandler(message -> LOGGER.info("[strands-bridge] {}", message));
 
             McpSyncClient created = McpClient.sync(transport)
                     .initializationTimeout(configuration.initializationTimeout())
@@ -98,11 +105,7 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
                 client = created;
                 return created;
             } catch (RuntimeException exception) {
-                try {
-                    created.closeGracefully();
-                } catch (RuntimeException closeFailure) {
-                    exception.addSuppressed(closeFailure);
-                }
+                created.closeGracefully();
                 throw exception;
             }
         }
@@ -129,6 +132,28 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
         client = null;
         if (existing != null) {
             existing.closeGracefully();
+        }
+    }
+
+    /** Prevents product secrets in the Java process environment from leaking into Strands. */
+    private static final class IsolatedStdioClientTransport extends StdioClientTransport {
+        private final Map<String, String> isolatedEnvironment;
+
+        private IsolatedStdioClientTransport(
+                ServerParameters serverParameters,
+                McpJsonMapper jsonMapper,
+                Map<String, String> isolatedEnvironment
+        ) {
+            super(serverParameters, jsonMapper);
+            this.isolatedEnvironment = Map.copyOf(isolatedEnvironment);
+        }
+
+        @Override
+        protected ProcessBuilder getProcessBuilder() {
+            ProcessBuilder processBuilder = super.getProcessBuilder();
+            processBuilder.environment().clear();
+            processBuilder.environment().putAll(isolatedEnvironment);
+            return processBuilder;
         }
     }
 }
