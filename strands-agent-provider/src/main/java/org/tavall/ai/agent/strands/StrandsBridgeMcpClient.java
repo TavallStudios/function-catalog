@@ -11,6 +11,7 @@ import io.modelcontextprotocol.spec.McpSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,6 +20,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /** Lifecycle owner for the Java -> standalone Strands MCP connection. */
 public final class StrandsBridgeMcpClient implements AutoCloseable {
     public static final String CREATE_AGENT_TOOL = "strands_agent_create";
+    public static final String INVOKE_AGENT_TOOL = "strands_agent_invoke";
+    public static final String CANCEL_AGENT_TOOL = "strands_agent_cancel";
     public static final String INVOKE_ONCE_TOOL = "strands_agent_invoke_once";
     public static final String CLOSE_AGENT_TOOL = "strands_agent_close";
 
@@ -41,10 +44,48 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     }
 
-    /** Creates a sessionful Strands runtime through the standalone bridge. */
+    /** Creates an independent sessionful Strands runtime through the standalone bridge. */
     public void createAgent(Map<String, Object> runtimeConfig) {
+        createAgent(runtimeConfig, List.of());
+    }
+
+    /**
+     * Creates a sessionful Strands runtime and composes already-live sessions as native
+     * Strands agent-as-tool capabilities inside the standalone bridge process.
+     */
+    public void createAgent(
+            Map<String, Object> runtimeConfig,
+            List<StrandsAgentToolReference> agentTools
+    ) {
         Objects.requireNonNull(runtimeConfig, "runtimeConfig");
-        callForSuccess(CREATE_AGENT_TOOL, Map.of("config", runtimeConfig));
+        List<StrandsAgentToolReference> safeAgentTools = List.copyOf(
+                Objects.requireNonNull(agentTools, "agentTools")
+        );
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        arguments.put("config", runtimeConfig);
+        if (!safeAgentTools.isEmpty()) {
+            arguments.put(
+                    "agentTools",
+                    safeAgentTools.stream().map(StrandsAgentToolReference::toMcpValue).toList()
+            );
+        }
+        callForSuccess(CREATE_AGENT_TOOL, Map.copyOf(arguments));
+    }
+
+    /** Invokes one already-live sessionful Strands runtime. */
+    public String invokeAgent(String agentId, String input) {
+        String safeAgentId = requireText(agentId, "agentId");
+        String safeInput = Objects.requireNonNull(input, "input");
+        return callForText(
+                INVOKE_AGENT_TOOL,
+                Map.of("agentId", safeAgentId, "input", safeInput)
+        );
+    }
+
+    /** Cooperatively cancels the active invocation of one already-live Strands runtime. */
+    public void cancelAgent(String agentId) {
+        String safeAgentId = requireText(agentId, "agentId");
+        callForSuccess(CANCEL_AGENT_TOOL, Map.of("agentId", safeAgentId));
     }
 
     /** Closes a sessionful Strands runtime through the standalone bridge. */
@@ -56,23 +97,29 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
     public String invokeOnce(Map<String, Object> runtimeConfig, String input) {
         Objects.requireNonNull(runtimeConfig, "runtimeConfig");
         String safeInput = Objects.requireNonNull(input, "input");
-        McpSchema.CallToolResult result = client().callTool(new McpSchema.CallToolRequest(
+        return callForText(
                 INVOKE_ONCE_TOOL,
                 Map.of(
                         "config", runtimeConfig,
                         "input", safeInput
-                ),
+                )
+        );
+    }
+
+    private String callForText(String toolName, Map<String, Object> arguments) {
+        McpSchema.CallToolResult result = client().callTool(new McpSchema.CallToolRequest(
+                toolName,
+                arguments,
                 null
         ));
-
         String text = firstText(result.content());
         if (Boolean.TRUE.equals(result.isError())) {
             throw new IllegalStateException(text.isBlank()
-                    ? "Standalone Strands MCP runtime reported an error."
+                    ? "Standalone Strands MCP runtime tool failed: " + toolName
                     : text);
         }
         if (text.isBlank()) {
-            throw new IllegalStateException("Standalone Strands MCP runtime returned no text result.");
+            throw new IllegalStateException("Standalone Strands MCP runtime returned no text result for " + toolName + ".");
         }
         return text;
     }
@@ -123,12 +170,22 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
                     .build();
             try {
                 created.initialize();
-                boolean hasInvokeOnce = created.listTools().tools().stream()
-                        .anyMatch(tool -> INVOKE_ONCE_TOOL.equals(tool.name()));
-                if (!hasInvokeOnce) {
-                    throw new IllegalStateException(
-                            "Standalone Strands MCP runtime does not expose " + INVOKE_ONCE_TOOL
-                    );
+                List<String> requiredTools = List.of(
+                        CREATE_AGENT_TOOL,
+                        INVOKE_AGENT_TOOL,
+                        CANCEL_AGENT_TOOL,
+                        INVOKE_ONCE_TOOL,
+                        CLOSE_AGENT_TOOL
+                );
+                List<String> availableTools = created.listTools().tools().stream()
+                        .map(McpSchema.Tool::name)
+                        .toList();
+                for (String requiredTool : requiredTools) {
+                    if (!availableTools.contains(requiredTool)) {
+                        throw new IllegalStateException(
+                                "Standalone Strands MCP runtime does not expose " + requiredTool
+                        );
+                    }
                 }
                 client = created;
                 return created;
