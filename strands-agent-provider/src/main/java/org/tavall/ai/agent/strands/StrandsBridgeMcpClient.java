@@ -18,7 +18,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Lifecycle owner for the Java -> standalone Strands MCP connection. */
 public final class StrandsBridgeMcpClient implements AutoCloseable {
+    public static final String CREATE_AGENT_TOOL = "strands_agent_create";
     public static final String INVOKE_ONCE_TOOL = "strands_agent_invoke_once";
+    public static final String CLOSE_AGENT_TOOL = "strands_agent_close";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(StrandsBridgeMcpClient.class);
 
@@ -37,6 +39,18 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
     ) {
         this.configuration = Objects.requireNonNull(configuration, "configuration");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+    }
+
+    /** Creates a sessionful Strands runtime through the standalone bridge. */
+    public void createAgent(Map<String, Object> runtimeConfig) {
+        Objects.requireNonNull(runtimeConfig, "runtimeConfig");
+        callForSuccess(CREATE_AGENT_TOOL, Map.of("config", runtimeConfig));
+    }
+
+    /** Closes a sessionful Strands runtime through the standalone bridge. */
+    public void closeAgent(String agentId) {
+        String safeAgentId = requireText(agentId, "agentId");
+        callForSuccess(CLOSE_AGENT_TOOL, Map.of("agentId", safeAgentId));
     }
 
     public String invokeOnce(Map<String, Object> runtimeConfig, String input) {
@@ -61,6 +75,20 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
             throw new IllegalStateException("Standalone Strands MCP runtime returned no text result.");
         }
         return text;
+    }
+
+    private void callForSuccess(String toolName, Map<String, Object> arguments) {
+        McpSchema.CallToolResult result = client().callTool(new McpSchema.CallToolRequest(
+                toolName,
+                arguments,
+                null
+        ));
+        if (Boolean.TRUE.equals(result.isError())) {
+            String text = firstText(result.content());
+            throw new IllegalStateException(text.isBlank()
+                    ? "Standalone Strands MCP runtime tool failed: " + toolName
+                    : text);
+        }
     }
 
     private McpSyncClient client() {
@@ -121,6 +149,13 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
             }
         }
         return "";
+    }
+
+    private static String requireText(String value, String fieldName) {
+        if (value != null && !value.isBlank()) {
+            return value.trim();
+        }
+        throw new IllegalArgumentException(fieldName + " must not be blank");
     }
 
     @Override
