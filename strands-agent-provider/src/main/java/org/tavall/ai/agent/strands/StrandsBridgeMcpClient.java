@@ -1,0 +1,134 @@
+package org.tavall.ai.agent.strands;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.client.McpClient;
+import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.ServerParameters;
+import io.modelcontextprotocol.client.transport.StdioClientTransport;
+import io.modelcontextprotocol.json.jackson2.JacksonMcpJsonMapper;
+import io.modelcontextprotocol.spec.McpSchema;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/** Lifecycle owner for the Java -> standalone Strands MCP connection. */
+public final class StrandsBridgeMcpClient implements AutoCloseable {
+    public static final String INVOKE_ONCE_TOOL = "strands_agent_invoke_once";
+
+    private final StrandsAgentProviderConfiguration configuration;
+    private final ObjectMapper objectMapper;
+    private final AtomicBoolean closed = new AtomicBoolean();
+    private volatile McpSyncClient client;
+
+    public StrandsBridgeMcpClient(StrandsAgentProviderConfiguration configuration) {
+        this(configuration, new ObjectMapper());
+    }
+
+    StrandsBridgeMcpClient(
+            StrandsAgentProviderConfiguration configuration,
+            ObjectMapper objectMapper
+    ) {
+        this.configuration = Objects.requireNonNull(configuration, "configuration");
+        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+    }
+
+    public String invokeOnce(Map<String, Object> runtimeConfig, String input) {
+        Objects.requireNonNull(runtimeConfig, "runtimeConfig");
+        String safeInput = Objects.requireNonNull(input, "input");
+        McpSchema.CallToolResult result = client().callTool(new McpSchema.CallToolRequest(
+                INVOKE_ONCE_TOOL,
+                Map.of(
+                        "config", runtimeConfig,
+                        "input", safeInput
+                ),
+                null
+        ));
+
+        String text = firstText(result.content());
+        if (Boolean.TRUE.equals(result.isError())) {
+            throw new IllegalStateException(text.isBlank()
+                    ? "Standalone Strands MCP runtime reported an error."
+                    : text);
+        }
+        if (text.isBlank()) {
+            throw new IllegalStateException("Standalone Strands MCP runtime returned no text result.");
+        }
+        return text;
+    }
+
+    private McpSyncClient client() {
+        McpSyncClient existing = client;
+        if (existing != null) {
+            return existing;
+        }
+
+        synchronized (this) {
+            if (closed.get()) {
+                throw new IllegalStateException("Strands bridge MCP client is closed.");
+            }
+            if (client != null) {
+                return client;
+            }
+
+            ServerParameters serverParameters = ServerParameters.builder(configuration.command())
+                    .args(configuration.arguments())
+                    .env(configuration.environment())
+                    .build();
+            StdioClientTransport transport = new StdioClientTransport(
+                    serverParameters,
+                    new JacksonMcpJsonMapper(objectMapper)
+            );
+            transport.setStdErrorHandler(message -> System.err.println("[strands-bridge] " + message));
+
+            McpSyncClient created = McpClient.sync(transport)
+                    .initializationTimeout(configuration.initializationTimeout())
+                    .requestTimeout(configuration.requestTimeout())
+                    .build();
+            try {
+                created.initialize();
+                boolean hasInvokeOnce = created.listTools().tools().stream()
+                        .anyMatch(tool -> INVOKE_ONCE_TOOL.equals(tool.name()));
+                if (!hasInvokeOnce) {
+                    throw new IllegalStateException(
+                            "Standalone Strands MCP runtime does not expose " + INVOKE_ONCE_TOOL
+                    );
+                }
+                client = created;
+                return created;
+            } catch (RuntimeException exception) {
+                try {
+                    created.closeGracefully();
+                } catch (RuntimeException closeFailure) {
+                    exception.addSuppressed(closeFailure);
+                }
+                throw exception;
+            }
+        }
+    }
+
+    private static String firstText(List<McpSchema.Content> content) {
+        if (content == null) {
+            return "";
+        }
+        for (McpSchema.Content item : content) {
+            if (item instanceof McpSchema.TextContent textContent) {
+                return textContent.text() == null ? "" : textContent.text();
+            }
+        }
+        return "";
+    }
+
+    @Override
+    public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+        McpSyncClient existing = client;
+        client = null;
+        if (existing != null) {
+            existing.closeGracefully();
+        }
+    }
+}
