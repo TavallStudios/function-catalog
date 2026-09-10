@@ -17,6 +17,7 @@ junit = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.4" }
 mcp-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcp" }
 mcp-jackson = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson3", version.ref = "mcp" }
+mcp-jackson2 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson2", version.ref = "mcp" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 slf4j = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
