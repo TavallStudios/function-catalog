@@ -19,7 +19,7 @@ public record StrandsAgentProviderConfiguration(
         String modelId
 ) {
     public StrandsAgentProviderConfiguration {
-        command = requireText(command, "command");
+        command = requireExecutable(command);
         arguments = List.copyOf(arguments == null ? List.of() : new ArrayList<>(arguments));
         environment = Map.copyOf(environment == null ? Map.of() : new LinkedHashMap<>(environment));
         initializationTimeout = requirePositive(initializationTimeout, "initializationTimeout");
@@ -30,25 +30,60 @@ public record StrandsAgentProviderConfiguration(
     public static StrandsAgentProviderConfiguration node(
             Path nodeExecutable,
             Path bridgeEntrypoint,
+            Map<String, String> environment,
             Duration requestTimeout,
             String modelId
     ) {
-        Path safeNodeExecutable = Objects.requireNonNull(nodeExecutable, "nodeExecutable").toAbsolutePath().normalize();
-        Path safeBridgeEntrypoint = Objects.requireNonNull(bridgeEntrypoint, "bridgeEntrypoint").toAbsolutePath().normalize();
-        if (!Files.isRegularFile(safeNodeExecutable) || !Files.isExecutable(safeNodeExecutable)) {
-            throw new IllegalArgumentException("Node executable is unavailable or not executable: " + safeNodeExecutable);
-        }
+        Path safeNodeExecutable = requireExecutablePath(nodeExecutable, "nodeExecutable");
+        Path safeBridgeEntrypoint = Objects.requireNonNull(bridgeEntrypoint, "bridgeEntrypoint")
+                .toAbsolutePath()
+                .normalize();
         if (!Files.isRegularFile(safeBridgeEntrypoint)) {
             throw new IllegalArgumentException("Strands bridge entrypoint is unavailable: " + safeBridgeEntrypoint);
         }
         return new StrandsAgentProviderConfiguration(
                 safeNodeExecutable.toString(),
                 List.of(safeBridgeEntrypoint.toString()),
-                Map.of(),
+                environment,
                 Duration.ofSeconds(20),
                 requestTimeout,
                 modelId
         );
+    }
+
+    public static StrandsAgentProviderConfiguration executable(
+            Path executable,
+            List<String> arguments,
+            Map<String, String> environment,
+            Duration requestTimeout,
+            String modelId
+    ) {
+        Path safeExecutable = requireExecutablePath(executable, "executable");
+        return new StrandsAgentProviderConfiguration(
+                safeExecutable.toString(),
+                arguments,
+                environment,
+                Duration.ofSeconds(20),
+                requestTimeout,
+                modelId
+        );
+    }
+
+    private static String requireExecutable(String value) {
+        String safeValue = requireText(value, "command");
+        Path path = Path.of(safeValue);
+        if (!path.isAbsolute()) {
+            throw new IllegalArgumentException("command must be an absolute executable path");
+        }
+        return requireExecutablePath(path, "command").toString();
+    }
+
+    private static Path requireExecutablePath(Path value, String fieldName) {
+        Path safePath = Objects.requireNonNull(value, fieldName).toAbsolutePath().normalize();
+        if (!Files.isRegularFile(safePath) || !Files.isExecutable(safePath)) {
+            throw new IllegalArgumentException(fieldName + " is unavailable or not executable: " + safePath);
+        }
+        return safePath;
     }
 
     private static Duration requirePositive(Duration value, String fieldName) {
