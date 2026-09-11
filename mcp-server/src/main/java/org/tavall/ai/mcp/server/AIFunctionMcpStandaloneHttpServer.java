@@ -7,6 +7,7 @@ import io.modelcontextprotocol.server.McpServerFeatures.SyncPromptSpecification;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncResourceSpecification;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
+import jakarta.servlet.http.HttpServlet;
 import org.apache.catalina.Context;
 import org.apache.catalina.startup.Tomcat;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
@@ -17,9 +18,11 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Reusable long-lived Streamable HTTP MCP host for a Function Catalog. */
@@ -50,7 +53,8 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             Configuration configuration,
             List<SyncResourceSpecification> resources,
             List<SyncPromptSpecification> prompts,
-            Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations
+            Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations,
+            List<ServletRegistration> supplementalServlets
     ) {
         AIFunctionCatalog safeCatalog = Objects.requireNonNull(catalog, "catalog");
         Configuration safeConfiguration = Objects.requireNonNull(configuration, "configuration");
@@ -58,6 +62,9 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         List<SyncPromptSpecification> safePrompts = List.copyOf(Objects.requireNonNull(prompts, "prompts"));
         Map<String, AIFunctionMcpToolPublisher.ToolPresentation> safePresentations = Map.copyOf(
                 Objects.requireNonNull(presentations, "presentations")
+        );
+        List<ServletRegistration> safeSupplementalServlets = List.copyOf(
+                Objects.requireNonNull(supplementalServlets, "supplementalServlets")
         );
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         McpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
@@ -86,6 +93,7 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         Tomcat.addServlet(context, "tavallFunctionCatalogStandaloneMcp", transportProvider);
         context.addServletMappingDecoded(safeConfiguration.endpoint(), "tavallFunctionCatalogStandaloneMcp");
         context.addServletMappingDecoded(safeConfiguration.endpoint() + "/*", "tavallFunctionCatalogStandaloneMcp");
+        registerSupplementalServlets(context, safeSupplementalServlets);
         try {
             tomcat.start();
             return new AIFunctionMcpStandaloneHttpServer(
@@ -101,13 +109,23 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             AIFunctionCatalog catalog,
             Configuration configuration,
             List<SyncResourceSpecification> resources,
+            List<SyncPromptSpecification> prompts,
+            Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations
+    ) {
+        return start(catalog, configuration, resources, prompts, presentations, List.of());
+    }
+
+    public static AIFunctionMcpStandaloneHttpServer start(
+            AIFunctionCatalog catalog,
+            Configuration configuration,
+            List<SyncResourceSpecification> resources,
             List<SyncPromptSpecification> prompts
     ) {
-        return start(catalog, configuration, resources, prompts, Map.of());
+        return start(catalog, configuration, resources, prompts, Map.of(), List.of());
     }
 
     public static AIFunctionMcpStandaloneHttpServer start(AIFunctionCatalog catalog, Configuration configuration) {
-        return start(catalog, configuration, List.of(), List.of(), Map.of());
+        return start(catalog, configuration, List.of(), List.of(), Map.of(), List.of());
     }
 
     public int port() {
@@ -160,6 +178,23 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         }
     }
 
+    private static void registerSupplementalServlets(Context context, List<ServletRegistration> registrations) {
+        Set<String> names = new HashSet<>();
+        Set<String> mappings = new HashSet<>();
+        for (ServletRegistration registration : registrations) {
+            if (!names.add(registration.name())) {
+                throw new IllegalArgumentException("Duplicate supplemental servlet name: " + registration.name());
+            }
+            Tomcat.addServlet(context, registration.name(), registration.servlet());
+            for (String mapping : registration.mappings()) {
+                if (!mappings.add(mapping)) {
+                    throw new IllegalArgumentException("Duplicate supplemental servlet mapping: " + mapping);
+                }
+                context.addServletMappingDecoded(mapping, registration.name());
+            }
+        }
+    }
+
     private static Path createBaseDirectory() {
         try {
             return Files.createTempDirectory("tavall-function-mcp-http-");
@@ -202,6 +237,22 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             });
         } catch (IOException exception) {
             throw new UncheckedIOException("Failed to delete standalone Function Catalog MCP base directory.", exception);
+        }
+    }
+
+    public record ServletRegistration(String name, HttpServlet servlet, List<String> mappings) {
+        public ServletRegistration {
+            name = requireText(name, "name");
+            servlet = Objects.requireNonNull(servlet, "servlet");
+            mappings = List.copyOf(Objects.requireNonNull(mappings, "mappings"));
+            if (mappings.isEmpty()) {
+                throw new IllegalArgumentException("Servlet mappings must not be empty");
+            }
+            for (String mapping : mappings) {
+                if (mapping == null || mapping.isBlank() || !mapping.startsWith("/")) {
+                    throw new IllegalArgumentException("Servlet mappings must be absolute paths");
+                }
+            }
         }
     }
 
