@@ -7,9 +7,12 @@ import io.modelcontextprotocol.server.McpServerFeatures.SyncPromptSpecification;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncResourceSpecification;
 import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
+import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServlet;
 import org.apache.catalina.Context;
 import org.apache.catalina.startup.Tomcat;
+import org.apache.tomcat.util.descriptor.web.FilterDef;
+import org.apache.tomcat.util.descriptor.web.FilterMap;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
 
 import java.io.IOException;
@@ -54,7 +57,8 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             List<SyncResourceSpecification> resources,
             List<SyncPromptSpecification> prompts,
             Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations,
-            List<ServletRegistration> supplementalServlets
+            List<ServletRegistration> supplementalServlets,
+            List<FilterRegistration> filters
     ) {
         AIFunctionCatalog safeCatalog = Objects.requireNonNull(catalog, "catalog");
         Configuration safeConfiguration = Objects.requireNonNull(configuration, "configuration");
@@ -66,6 +70,7 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         List<ServletRegistration> safeSupplementalServlets = List.copyOf(
                 Objects.requireNonNull(supplementalServlets, "supplementalServlets")
         );
+        List<FilterRegistration> safeFilters = List.copyOf(Objects.requireNonNull(filters, "filters"));
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         McpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
         AIFunctionMcpToolPublisher publisher = new AIFunctionMcpToolPublisher(objectMapper);
@@ -89,11 +94,13 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         tomcat.setPort(safeConfiguration.port());
         tomcat.getConnector();
         tomcat.getConnector().setProperty("address", safeConfiguration.address());
+        safeConfiguration.connectorProperties().forEach(tomcat.getConnector()::setProperty);
         Context context = tomcat.addContext(safeConfiguration.contextPath(), baseDirectory.toAbsolutePath().toString());
         Tomcat.addServlet(context, "tavallFunctionCatalogStandaloneMcp", transportProvider);
         context.addServletMappingDecoded(safeConfiguration.endpoint(), "tavallFunctionCatalogStandaloneMcp");
         context.addServletMappingDecoded(safeConfiguration.endpoint() + "/*", "tavallFunctionCatalogStandaloneMcp");
         registerSupplementalServlets(context, safeSupplementalServlets);
+        registerFilters(context, safeFilters);
         try {
             tomcat.start();
             return new AIFunctionMcpStandaloneHttpServer(
@@ -110,9 +117,20 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             Configuration configuration,
             List<SyncResourceSpecification> resources,
             List<SyncPromptSpecification> prompts,
+            Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations,
+            List<ServletRegistration> supplementalServlets
+    ) {
+        return start(catalog, configuration, resources, prompts, presentations, supplementalServlets, List.of());
+    }
+
+    public static AIFunctionMcpStandaloneHttpServer start(
+            AIFunctionCatalog catalog,
+            Configuration configuration,
+            List<SyncResourceSpecification> resources,
+            List<SyncPromptSpecification> prompts,
             Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations
     ) {
-        return start(catalog, configuration, resources, prompts, presentations, List.of());
+        return start(catalog, configuration, resources, prompts, presentations, List.of(), List.of());
     }
 
     public static AIFunctionMcpStandaloneHttpServer start(
@@ -121,11 +139,11 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             List<SyncResourceSpecification> resources,
             List<SyncPromptSpecification> prompts
     ) {
-        return start(catalog, configuration, resources, prompts, Map.of(), List.of());
+        return start(catalog, configuration, resources, prompts, Map.of(), List.of(), List.of());
     }
 
     public static AIFunctionMcpStandaloneHttpServer start(AIFunctionCatalog catalog, Configuration configuration) {
-        return start(catalog, configuration, List.of(), List.of(), Map.of(), List.of());
+        return start(catalog, configuration, List.of(), List.of(), Map.of(), List.of(), List.of());
     }
 
     public int port() {
@@ -195,6 +213,25 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         }
     }
 
+    private static void registerFilters(Context context, List<FilterRegistration> registrations) {
+        Set<String> names = new HashSet<>();
+        for (FilterRegistration registration : registrations) {
+            if (!names.add(registration.name())) {
+                throw new IllegalArgumentException("Duplicate HTTP filter name: " + registration.name());
+            }
+            FilterDef definition = new FilterDef();
+            definition.setFilterName(registration.name());
+            definition.setFilter(registration.filter());
+            context.addFilterDef(definition);
+            FilterMap mapping = new FilterMap();
+            mapping.setFilterName(registration.name());
+            for (String urlPattern : registration.urlPatterns()) {
+                mapping.addURLPattern(urlPattern);
+            }
+            context.addFilterMap(mapping);
+        }
+    }
+
     private static Path createBaseDirectory() {
         try {
             return Files.createTempDirectory("tavall-function-mcp-http-");
@@ -244,15 +281,15 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         public ServletRegistration {
             name = requireText(name, "name");
             servlet = Objects.requireNonNull(servlet, "servlet");
-            mappings = List.copyOf(Objects.requireNonNull(mappings, "mappings"));
-            if (mappings.isEmpty()) {
-                throw new IllegalArgumentException("Servlet mappings must not be empty");
-            }
-            for (String mapping : mappings) {
-                if (mapping == null || mapping.isBlank() || !mapping.startsWith("/")) {
-                    throw new IllegalArgumentException("Servlet mappings must be absolute paths");
-                }
-            }
+            mappings = absolutePaths(mappings, "Servlet mappings");
+        }
+    }
+
+    public record FilterRegistration(String name, Filter filter, List<String> urlPatterns) {
+        public FilterRegistration {
+            name = requireText(name, "name");
+            filter = Objects.requireNonNull(filter, "filter");
+            urlPatterns = absolutePaths(urlPatterns, "Filter URL patterns");
         }
     }
 
@@ -263,8 +300,21 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             String endpoint,
             String serverName,
             String serverVersion,
-            String instructions
+            String instructions,
+            Map<String, String> connectorProperties
     ) {
+        public Configuration(
+                String address,
+                int port,
+                String contextPath,
+                String endpoint,
+                String serverName,
+                String serverVersion,
+                String instructions
+        ) {
+            this(address, port, contextPath, endpoint, serverName, serverVersion, instructions, Map.of());
+        }
+
         public Configuration {
             address = requireText(address, "address");
             if (port < 0 || port > 65_535) {
@@ -275,6 +325,7 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             serverName = requireText(serverName, "serverName");
             serverVersion = requireText(serverVersion, "serverVersion");
             instructions = Objects.requireNonNullElse(instructions, "");
+            connectorProperties = Map.copyOf(Objects.requireNonNull(connectorProperties, "connectorProperties"));
         }
 
         public static Configuration defaults(String serverName, String serverVersion, String instructions) {
@@ -296,12 +347,25 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             String normalized = value.startsWith("/") ? value : "/" + value;
             return normalized.endsWith("/") ? normalized.substring(0, normalized.length() - 1) : normalized;
         }
+    }
 
-        private static String requireText(String value, String fieldName) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-            throw new IllegalArgumentException(fieldName + " must not be blank");
+    private static List<String> absolutePaths(List<String> values, String label) {
+        List<String> safeValues = List.copyOf(Objects.requireNonNull(values, "values"));
+        if (safeValues.isEmpty()) {
+            throw new IllegalArgumentException(label + " must not be empty");
         }
+        for (String value : safeValues) {
+            if (value == null || value.isBlank() || !value.startsWith("/")) {
+                throw new IllegalArgumentException(label + " must be absolute paths");
+            }
+        }
+        return safeValues;
+    }
+
+    private static String requireText(String value, String fieldName) {
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+        throw new IllegalArgumentException(fieldName + " must not be blank");
     }
 }
