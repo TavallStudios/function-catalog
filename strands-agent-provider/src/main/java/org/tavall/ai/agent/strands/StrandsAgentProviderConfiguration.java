@@ -23,7 +23,7 @@ public record StrandsAgentProviderConfiguration(
         arguments = List.copyOf(arguments == null ? List.of() : new ArrayList<>(arguments));
         environment = Map.copyOf(environment == null ? Map.of() : new LinkedHashMap<>(environment));
         initializationTimeout = requirePositive(initializationTimeout, "initializationTimeout");
-        requestTimeout = requirePositive(requestTimeout, "requestTimeout");
+        requestTimeout = requireNonnegative(requestTimeout, "requestTimeout");
         modelId = modelId == null ? "" : modelId.trim();
     }
 
@@ -90,6 +90,14 @@ public record StrandsAgentProviderConfiguration(
         Duration safeValue = Objects.requireNonNull(value, fieldName);
         if (safeValue.isZero() || safeValue.isNegative()) {
             throw new IllegalArgumentException(fieldName + " must be positive");
+        }
+        return safeValue;
+    }
+
+    private static Duration requireNonnegative(Duration value, String fieldName) {
+        Duration safeValue = Objects.requireNonNull(value, fieldName);
+        if (safeValue.isNegative()) {
+            throw new IllegalArgumentException(fieldName + " must not be negative; use zero for unlimited");
         }
         return safeValue;
     }
