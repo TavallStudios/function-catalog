@@ -47,15 +47,10 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     }
 
-    /** Creates an independent sessionful Strands runtime through the standalone bridge. */
     public void createAgent(Map<String, Object> runtimeConfig) {
         createAgent(runtimeConfig, List.of());
     }
 
-    /**
-     * Creates a sessionful Strands runtime and composes already-live sessions as native
-     * Strands agent-as-tool capabilities inside the standalone bridge process.
-     */
     public void createAgent(
             Map<String, Object> runtimeConfig,
             List<StrandsAgentToolReference> agentTools
@@ -75,7 +70,6 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
         callForSuccess(CREATE_AGENT_TOOL, Map.copyOf(arguments));
     }
 
-    /** Invokes one already-live sessionful Strands runtime. */
     public String invokeAgent(String agentId, String input) {
         String safeAgentId = requireText(agentId, "agentId");
         String safeInput = Objects.requireNonNull(input, "input");
@@ -85,11 +79,6 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
         );
     }
 
-    /**
-     * Invokes a live Strands runtime and returns the normalized native tool lifecycle
-     * evidence emitted during that invocation. Product-specific trust policy remains
-     * outside this shared transport client.
-     */
     public StrandsObservedInvocationResult invokeAgentObserved(
             String agentId,
             String input,
@@ -144,13 +133,11 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
         return new StrandsObservedInvocationResult(returnedAgentId, text, stopReason, toolEvents);
     }
 
-    /** Cooperatively cancels the active invocation of one already-live Strands runtime. */
     public void cancelAgent(String agentId) {
         String safeAgentId = requireText(agentId, "agentId");
         callForSuccess(CANCEL_AGENT_TOOL, Map.of("agentId", safeAgentId));
     }
 
-    /** Closes a sessionful Strands runtime through the standalone bridge. */
     public void closeAgent(String agentId) {
         String safeAgentId = requireText(agentId, "agentId");
         callForSuccess(CLOSE_AGENT_TOOL, Map.of("agentId", safeAgentId));
@@ -225,10 +212,12 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
             );
             transport.setStdErrorHandler(message -> LOGGER.info("[strands-bridge] {}", message));
 
-            McpSyncClient created = McpClient.sync(transport)
-                    .initializationTimeout(configuration.initializationTimeout())
-                    .requestTimeout(configuration.requestTimeout())
-                    .build();
+            var clientBuilder = McpClient.sync(transport)
+                    .initializationTimeout(configuration.initializationTimeout());
+            if (!configuration.requestTimeout().isZero()) {
+                clientBuilder.requestTimeout(configuration.requestTimeout());
+            }
+            McpSyncClient created = clientBuilder.build();
             try {
                 created.initialize();
                 List<String> requiredTools = List.of(
@@ -302,7 +291,6 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
         }
     }
 
-    /** Prevents product secrets in the Java process environment from leaking into Strands. */
     private static final class IsolatedStdioClientTransport extends StdioClientTransport {
         private final Map<String, String> isolatedEnvironment;
 
