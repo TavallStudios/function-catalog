@@ -18,16 +18,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Reusable long-lived Streamable HTTP MCP host for a Function Catalog.
- *
- * <p>Application code owns the catalog, product-specific resources, prompts, policy, and public
- * deployment configuration. This class owns only the Java MCP HTTP transport and embedded server
- * lifecycle.</p>
- */
+/** Reusable long-lived Streamable HTTP MCP host for a Function Catalog. */
 public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
     private final Configuration configuration;
     private final Path baseDirectory;
@@ -50,32 +45,33 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         this.transportProvider = Objects.requireNonNull(transportProvider, "transportProvider");
     }
 
-    /** Starts a Streamable HTTP MCP server for the supplied catalog and optional resource surfaces. */
     public static AIFunctionMcpStandaloneHttpServer start(
             AIFunctionCatalog catalog,
             Configuration configuration,
             List<SyncResourceSpecification> resources,
-            List<SyncPromptSpecification> prompts
+            List<SyncPromptSpecification> prompts,
+            Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations
     ) {
         AIFunctionCatalog safeCatalog = Objects.requireNonNull(catalog, "catalog");
         Configuration safeConfiguration = Objects.requireNonNull(configuration, "configuration");
         List<SyncResourceSpecification> safeResources = List.copyOf(Objects.requireNonNull(resources, "resources"));
         List<SyncPromptSpecification> safePrompts = List.copyOf(Objects.requireNonNull(prompts, "prompts"));
+        Map<String, AIFunctionMcpToolPublisher.ToolPresentation> safePresentations = Map.copyOf(
+                Objects.requireNonNull(presentations, "presentations")
+        );
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
         McpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
         AIFunctionMcpToolPublisher publisher = new AIFunctionMcpToolPublisher(objectMapper);
-
         HttpServletStreamableServerTransportProvider transportProvider =
                 HttpServletStreamableServerTransportProvider.builder()
                         .jsonMapper(jsonMapper)
                         .mcpEndpoint(safeConfiguration.endpoint())
                         .build();
-
         McpSyncServer mcpServer = McpServer.sync(transportProvider)
                 .serverInfo(safeConfiguration.serverName(), safeConfiguration.serverVersion())
                 .instructions(safeConfiguration.instructions())
                 .jsonMapper(jsonMapper)
-                .tools(publisher.toolSpecifications(safeCatalog))
+                .tools(publisher.toolSpecifications(safeCatalog, safePresentations))
                 .resources(safeResources)
                 .prompts(safePrompts)
                 .build();
@@ -86,23 +82,14 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         tomcat.setPort(safeConfiguration.port());
         tomcat.getConnector();
         tomcat.getConnector().setProperty("address", safeConfiguration.address());
-
-        Context context = tomcat.addContext(
-                safeConfiguration.contextPath(),
-                baseDirectory.toAbsolutePath().toString()
-        );
+        Context context = tomcat.addContext(safeConfiguration.contextPath(), baseDirectory.toAbsolutePath().toString());
         Tomcat.addServlet(context, "tavallFunctionCatalogStandaloneMcp", transportProvider);
         context.addServletMappingDecoded(safeConfiguration.endpoint(), "tavallFunctionCatalogStandaloneMcp");
         context.addServletMappingDecoded(safeConfiguration.endpoint() + "/*", "tavallFunctionCatalogStandaloneMcp");
-
         try {
             tomcat.start();
             return new AIFunctionMcpStandaloneHttpServer(
-                    safeConfiguration,
-                    baseDirectory,
-                    tomcat,
-                    mcpServer,
-                    transportProvider
+                    safeConfiguration, baseDirectory, tomcat, mcpServer, transportProvider
             );
         } catch (Exception exception) {
             closeFailedStart(mcpServer, transportProvider, tomcat, baseDirectory);
@@ -110,12 +97,17 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         }
     }
 
-    /** Starts a tools-only server with no custom resources or prompts. */
     public static AIFunctionMcpStandaloneHttpServer start(
             AIFunctionCatalog catalog,
-            Configuration configuration
+            Configuration configuration,
+            List<SyncResourceSpecification> resources,
+            List<SyncPromptSpecification> prompts
     ) {
-        return start(catalog, configuration, List.of(), List.of());
+        return start(catalog, configuration, resources, prompts, Map.of());
+    }
+
+    public static AIFunctionMcpStandaloneHttpServer start(AIFunctionCatalog catalog, Configuration configuration) {
+        return start(catalog, configuration, List.of(), List.of(), Map.of());
     }
 
     public int port() {
@@ -139,7 +131,6 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
-
         RuntimeException failure = null;
         try {
             mcpServer.close();
@@ -150,10 +141,9 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             tomcat.stop();
             tomcat.destroy();
         } catch (Exception exception) {
-            failure = appendFailure(
-                    failure,
-                    new IllegalStateException("Failed to stop standalone Function Catalog MCP HTTP server.", exception)
-            );
+            failure = appendFailure(failure, new IllegalStateException(
+                    "Failed to stop standalone Function Catalog MCP HTTP server.", exception
+            ));
         }
         try {
             transportProvider.close();
@@ -165,7 +155,6 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         } catch (RuntimeException exception) {
             failure = appendFailure(failure, exception);
         }
-
         if (failure != null) {
             throw failure;
         }
@@ -185,26 +174,10 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
             Tomcat tomcat,
             Path baseDirectory
     ) {
-        try {
-            mcpServer.close();
-        } catch (RuntimeException ignored) {
-            // Preserve the startup failure.
-        }
-        try {
-            tomcat.destroy();
-        } catch (Exception ignored) {
-            // Preserve the startup failure.
-        }
-        try {
-            transportProvider.close();
-        } catch (RuntimeException ignored) {
-            // Preserve the startup failure.
-        }
-        try {
-            deleteRecursively(baseDirectory);
-        } catch (RuntimeException ignored) {
-            // Preserve the startup failure.
-        }
+        try { mcpServer.close(); } catch (RuntimeException ignored) { }
+        try { tomcat.destroy(); } catch (Exception ignored) { }
+        try { transportProvider.close(); } catch (RuntimeException ignored) { }
+        try { deleteRecursively(baseDirectory); } catch (RuntimeException ignored) { }
     }
 
     private static RuntimeException appendFailure(RuntimeException current, RuntimeException next) {
@@ -232,7 +205,6 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         }
     }
 
-    /** Immutable public HTTP hosting configuration. */
     public record Configuration(
             String address,
             int port,
@@ -255,15 +227,7 @@ public final class AIFunctionMcpStandaloneHttpServer implements AutoCloseable {
         }
 
         public static Configuration defaults(String serverName, String serverVersion, String instructions) {
-            return new Configuration(
-                    "127.0.0.1",
-                    9000,
-                    "",
-                    "/mcp",
-                    serverName,
-                    serverVersion,
-                    instructions
-            );
+            return new Configuration("127.0.0.1", 9000, "", "/mcp", serverName, serverVersion, instructions);
         }
 
         private static String normalizeContextPath(String value) {
