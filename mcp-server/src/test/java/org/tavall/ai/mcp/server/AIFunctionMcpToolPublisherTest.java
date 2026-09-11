@@ -70,6 +70,32 @@ class AIFunctionMcpToolPublisherTest {
         );
     }
 
+    @Test
+    void canProjectTextContentWithoutChangingStructuredContent() {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+        catalog.registerInstances(new TestFunctions());
+        AIFunctionMcpToolPublisher.ToolPresentation projection =
+                new AIFunctionMcpToolPublisher.ToolPresentation("", Map.of(), "/status");
+
+        var specification = new AIFunctionMcpToolPublisher(objectMapper)
+                .toolSpecifications(catalog, Map.of("chatgpt_rich", projection))
+                .stream()
+                .filter(candidate -> candidate.tool().name().equals("chatgpt_rich"))
+                .findFirst()
+                .orElseThrow();
+        McpSchema.CallToolResult result = specification.callHandler().apply(
+                null,
+                new McpSchema.CallToolRequest("chatgpt_rich", Map.of())
+        );
+
+        assertThat(result.structuredContent()).isEqualTo(Map.of("status", "ok"));
+        assertThat(result.content().getFirst()).isInstanceOfSatisfying(
+                McpSchema.TextContent.class,
+                text -> assertThat(text.text()).isEqualTo("\"ok\"")
+        );
+    }
+
     private static final class TestFunctions {
         @AIFunction(name = "chatgpt_status", description = "Visible ChatGPT capability")
         String chatGPTStatus() {

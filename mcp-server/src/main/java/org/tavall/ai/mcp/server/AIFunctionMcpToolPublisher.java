@@ -27,7 +27,15 @@ public final class AIFunctionMcpToolPublisher {
     }
 
     public List<SyncToolSpecification> toolSpecifications(AIFunctionCatalog catalog) {
-        return toolSpecifications(catalog, ignored -> true);
+        return toolSpecifications(catalog, ignored -> true, Map.of());
+    }
+
+    /** Publishes canonical tools while layering optional MCP projection metadata by function name. */
+    public List<SyncToolSpecification> toolSpecifications(
+            AIFunctionCatalog catalog,
+            Map<String, ToolPresentation> presentations
+    ) {
+        return toolSpecifications(catalog, ignored -> true, presentations);
     }
 
     /** Preserves the pre-view predicate API for existing trusted in-process publishers. */
@@ -35,10 +43,22 @@ public final class AIFunctionMcpToolPublisher {
             AIFunctionCatalog catalog,
             Predicate<AIFunctionDefinition> publicationFilter
     ) {
+        return toolSpecifications(catalog, publicationFilter, Map.of());
+    }
+
+    /** Publishes filtered canonical tools with MCP projection metadata that cannot alter execution. */
+    public List<SyncToolSpecification> toolSpecifications(
+            AIFunctionCatalog catalog,
+            Predicate<AIFunctionDefinition> publicationFilter,
+            Map<String, ToolPresentation> presentations
+    ) {
         AIFunctionCatalog safeCatalog = Objects.requireNonNull(catalog, "catalog");
         Predicate<AIFunctionDefinition> safeFilter = Objects.requireNonNull(
                 publicationFilter,
                 "publicationFilter"
+        );
+        Map<String, ToolPresentation> safePresentations = Map.copyOf(
+                Objects.requireNonNull(presentations, "presentations")
         );
         List<SyncToolSpecification> specifications = new ArrayList<>();
         for (AIFunctionDefinition definition : safeCatalog.getFunctionDefinitions().values()) {
@@ -46,10 +66,14 @@ public final class AIFunctionMcpToolPublisher {
                 continue;
             }
             String publishedFunctionName = definition.getName();
+            ToolPresentation presentation = safePresentations.get(publishedFunctionName);
             specifications.add(specification(
                     publishedFunctionName,
+                    presentation == null ? null : presentation.title(),
                     definition.getDescription(),
                     definition.getCanonicalParametersSchema(),
+                    presentation == null ? Map.of() : presentation.meta(),
+                    presentation == null ? "" : presentation.textContentJsonPointer(),
                     arguments -> safeCatalog.invokeResult(publishedFunctionName, arguments)
             ));
         }
@@ -64,8 +88,11 @@ public final class AIFunctionMcpToolPublisher {
             String publishedFunctionName = definition.getName();
             specifications.add(specification(
                     publishedFunctionName,
+                    null,
                     definition.getDescription(),
                     definition.getCanonicalParametersSchema(),
+                    Map.of(),
+                    "",
                     arguments -> safeCatalogView.invokeResult(publishedFunctionName, arguments)
             ));
         }
@@ -74,28 +101,43 @@ public final class AIFunctionMcpToolPublisher {
 
     private SyncToolSpecification specification(
             String functionName,
+            String title,
             String description,
             JsonNode canonicalParametersSchema,
+            Map<String, Object> meta,
+            String textContentJsonPointer,
             Invocation invocation
     ) {
         McpSchema.JsonSchema inputSchema = objectMapper.convertValue(
                 canonicalParametersSchema,
                 McpSchema.JsonSchema.class
         );
-        McpSchema.Tool tool = McpSchema.Tool.builder()
+        McpSchema.Tool.Builder toolBuilder = McpSchema.Tool.builder()
                 .name(functionName)
                 .description(description)
-                .inputSchema(inputSchema)
-                .build();
+                .inputSchema(inputSchema);
+        if (title != null && !title.isBlank()) {
+            toolBuilder.title(title);
+        }
+        if (!meta.isEmpty()) {
+            toolBuilder.meta(meta);
+        }
+        McpSchema.Tool tool = toolBuilder.build();
         return new SyncToolSpecification(
                 tool,
-                (exchange, request) -> result(invocation.invoke(
-                        objectMapper.valueToTree(request.arguments() == null ? Map.of() : request.arguments())
-                ))
+                (exchange, request) -> result(
+                        invocation.invoke(
+                                objectMapper.valueToTree(request.arguments() == null ? Map.of() : request.arguments())
+                        ),
+                        textContentJsonPointer
+                )
         );
     }
 
-    private McpSchema.CallToolResult result(AIFunctionInvocationResult result) {
+    private McpSchema.CallToolResult result(
+            AIFunctionInvocationResult result,
+            String textContentJsonPointer
+    ) {
         JsonNode invocationPayload = result.getPayload();
         JsonNode structuredPayload = invocationPayload;
         List<McpSchema.Content> content = new ArrayList<>();
@@ -111,13 +153,25 @@ public final class AIFunctionMcpToolPublisher {
             }
         }
 
-        content.addFirst(new McpSchema.TextContent(writeJson(structuredPayload)));
+        JsonNode textPayload = resolveTextPayload(structuredPayload, textContentJsonPointer);
+        content.addFirst(new McpSchema.TextContent(writeJson(textPayload)));
         return new McpSchema.CallToolResult(
                 List.copyOf(content),
                 result.isError(),
                 objectMapper.convertValue(structuredPayload, Object.class),
                 null
         );
+    }
+
+    private JsonNode resolveTextPayload(JsonNode structuredPayload, String jsonPointer) {
+        if (jsonPointer == null || jsonPointer.isBlank()) {
+            return structuredPayload;
+        }
+        JsonNode projected = structuredPayload.at(jsonPointer);
+        if (projected.isMissingNode()) {
+            throw new IllegalStateException("Configured MCP text-content JSON pointer did not resolve: " + jsonPointer);
+        }
+        return projected;
     }
 
     private boolean isRichOutput(JsonNode payload) {
@@ -162,6 +216,26 @@ public final class AIFunctionMcpToolPublisher {
             return objectMapper.writeValueAsString(payload);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to serialize MCP payload.", exception);
+        }
+    }
+
+    /** Human-facing presentation plus optional text-content projection over canonical execution. */
+    public record ToolPresentation(
+            String title,
+            Map<String, Object> meta,
+            String textContentJsonPointer
+    ) {
+        public ToolPresentation(String title, Map<String, Object> meta) {
+            this(title, meta, "");
+        }
+
+        public ToolPresentation {
+            title = title == null ? "" : title;
+            meta = meta == null ? Map.of() : Map.copyOf(meta);
+            textContentJsonPointer = textContentJsonPointer == null ? "" : textContentJsonPointer.trim();
+            if (!textContentJsonPointer.isEmpty() && !textContentJsonPointer.startsWith("/")) {
+                throw new IllegalArgumentException("textContentJsonPointer must be blank or an absolute JSON pointer");
+            }
         }
     }
 
