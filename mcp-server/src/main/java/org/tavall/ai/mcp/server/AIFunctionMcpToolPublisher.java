@@ -27,7 +27,15 @@ public final class AIFunctionMcpToolPublisher {
     }
 
     public List<SyncToolSpecification> toolSpecifications(AIFunctionCatalog catalog) {
-        return toolSpecifications(catalog, ignored -> true);
+        return toolSpecifications(catalog, ignored -> true, Map.of());
+    }
+
+    /** Publishes canonical tools while layering optional presentation-only MCP metadata by function name. */
+    public List<SyncToolSpecification> toolSpecifications(
+            AIFunctionCatalog catalog,
+            Map<String, ToolPresentation> presentations
+    ) {
+        return toolSpecifications(catalog, ignored -> true, presentations);
     }
 
     /** Preserves the pre-view predicate API for existing trusted in-process publishers. */
@@ -35,10 +43,22 @@ public final class AIFunctionMcpToolPublisher {
             AIFunctionCatalog catalog,
             Predicate<AIFunctionDefinition> publicationFilter
     ) {
+        return toolSpecifications(catalog, publicationFilter, Map.of());
+    }
+
+    /** Publishes filtered canonical tools with presentation metadata that cannot alter execution. */
+    public List<SyncToolSpecification> toolSpecifications(
+            AIFunctionCatalog catalog,
+            Predicate<AIFunctionDefinition> publicationFilter,
+            Map<String, ToolPresentation> presentations
+    ) {
         AIFunctionCatalog safeCatalog = Objects.requireNonNull(catalog, "catalog");
         Predicate<AIFunctionDefinition> safeFilter = Objects.requireNonNull(
                 publicationFilter,
                 "publicationFilter"
+        );
+        Map<String, ToolPresentation> safePresentations = Map.copyOf(
+                Objects.requireNonNull(presentations, "presentations")
         );
         List<SyncToolSpecification> specifications = new ArrayList<>();
         for (AIFunctionDefinition definition : safeCatalog.getFunctionDefinitions().values()) {
@@ -46,10 +66,13 @@ public final class AIFunctionMcpToolPublisher {
                 continue;
             }
             String publishedFunctionName = definition.getName();
+            ToolPresentation presentation = safePresentations.get(publishedFunctionName);
             specifications.add(specification(
                     publishedFunctionName,
+                    presentation == null ? null : presentation.title(),
                     definition.getDescription(),
                     definition.getCanonicalParametersSchema(),
+                    presentation == null ? Map.of() : presentation.meta(),
                     arguments -> safeCatalog.invokeResult(publishedFunctionName, arguments)
             ));
         }
@@ -64,8 +87,10 @@ public final class AIFunctionMcpToolPublisher {
             String publishedFunctionName = definition.getName();
             specifications.add(specification(
                     publishedFunctionName,
+                    null,
                     definition.getDescription(),
                     definition.getCanonicalParametersSchema(),
+                    Map.of(),
                     arguments -> safeCatalogView.invokeResult(publishedFunctionName, arguments)
             ));
         }
@@ -74,19 +99,27 @@ public final class AIFunctionMcpToolPublisher {
 
     private SyncToolSpecification specification(
             String functionName,
+            String title,
             String description,
             JsonNode canonicalParametersSchema,
+            Map<String, Object> meta,
             Invocation invocation
     ) {
         McpSchema.JsonSchema inputSchema = objectMapper.convertValue(
                 canonicalParametersSchema,
                 McpSchema.JsonSchema.class
         );
-        McpSchema.Tool tool = McpSchema.Tool.builder()
+        McpSchema.Tool.Builder toolBuilder = McpSchema.Tool.builder()
                 .name(functionName)
                 .description(description)
-                .inputSchema(inputSchema)
-                .build();
+                .inputSchema(inputSchema);
+        if (title != null && !title.isBlank()) {
+            toolBuilder.title(title);
+        }
+        if (!meta.isEmpty()) {
+            toolBuilder.meta(meta);
+        }
+        McpSchema.Tool tool = toolBuilder.build();
         return new SyncToolSpecification(
                 tool,
                 (exchange, request) -> result(invocation.invoke(
@@ -162,6 +195,14 @@ public final class AIFunctionMcpToolPublisher {
             return objectMapper.writeValueAsString(payload);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to serialize MCP payload.", exception);
+        }
+    }
+
+    /** Human-facing presentation metadata layered over canonical Function Catalog execution. */
+    public record ToolPresentation(String title, Map<String, Object> meta) {
+        public ToolPresentation {
+            title = title == null ? "" : title;
+            meta = meta == null ? Map.of() : Map.copyOf(meta);
         }
     }
 
