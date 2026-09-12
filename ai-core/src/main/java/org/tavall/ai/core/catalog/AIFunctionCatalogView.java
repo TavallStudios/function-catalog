@@ -42,19 +42,17 @@ public final class AIFunctionCatalogView {
         if (invocationControl.isRevoked()) {
             return Map.of();
         }
-        synchronized (catalog) {
-            if (invocationControl.isRevoked()) {
-                return Map.of();
-            }
-            Map<String, AIFunctionPublicationDefinition> definitions = new LinkedHashMap<>();
-            for (Map.Entry<String, AIFunctionDefinition> entry : catalog.getFunctionDefinitions().entrySet()) {
-                AIFunctionPublicationDefinition publication = publication(entry.getValue());
-                if (functionFilter.test(publication)) {
-                    definitions.put(entry.getKey(), publication);
-                }
-            }
-            return Collections.unmodifiableMap(definitions);
+        if (invocationControl.isRevoked()) {
+            return Map.of();
         }
+        Map<String, AIFunctionPublicationDefinition> definitions = new LinkedHashMap<>();
+        for (Map.Entry<String, AIFunctionDefinition> entry : catalog.getFunctionDefinitions().entrySet()) {
+            AIFunctionPublicationDefinition publication = publication(entry.getValue());
+            if (functionFilter.test(publication)) {
+                definitions.put(entry.getKey(), publication);
+            }
+        }
+        return Collections.unmodifiableMap(definitions);
     }
 
     public boolean allows(String functionName) {
@@ -62,13 +60,11 @@ public final class AIFunctionCatalogView {
             return false;
         }
         String safeFunctionName = requireText(functionName, "functionName");
-        synchronized (catalog) {
-            if (invocationControl.isRevoked()) {
-                return false;
-            }
-            AIFunctionDefinition definition = catalog.getFunctionDefinitions().get(safeFunctionName);
-            return definition != null && functionFilter.test(publication(definition));
+        if (invocationControl.isRevoked()) {
+            return false;
         }
+        AIFunctionDefinition definition = catalog.getFunctionDefinitions().get(safeFunctionName);
+        return definition != null && functionFilter.test(publication(definition));
     }
 
     /** Returns a same-catalog view that can only narrow the parent's published function surface. */
@@ -131,34 +127,32 @@ public final class AIFunctionCatalogView {
             return controlFailure(callId, safeFunctionName, safeArguments, invocationDecision);
         }
 
-        synchronized (catalog) {
-            if (invocationControl.isRevoked()) {
-                return failure(
-                        callId,
-                        safeFunctionName,
-                        safeArguments,
-                        VIEW_REVOKED_ERROR_CODE,
-                        "Function Catalog view has been revoked."
-                );
-            }
+        if (invocationControl.isRevoked()) {
+            return failure(
+                    callId,
+                    safeFunctionName,
+                    safeArguments,
+                    VIEW_REVOKED_ERROR_CODE,
+                    "Function Catalog view has been revoked."
+            );
+        }
 
-            AIFunctionDefinition definition = catalog.getFunctionDefinitions().get(safeFunctionName);
-            if (definition == null) {
-                return catalog.invokeResult(callId, safeFunctionName, safeArguments);
-            }
-
-            if (!functionFilter.test(publication(definition))) {
-                return failure(
-                        callId,
-                        safeFunctionName,
-                        safeArguments,
-                        SCOPE_DENIED_ERROR_CODE,
-                        "Function '" + safeFunctionName + "' is outside this catalog view."
-                );
-            }
-
+        AIFunctionDefinition definition = catalog.getFunctionDefinitions().get(safeFunctionName);
+        if (definition == null) {
             return catalog.invokeResult(callId, safeFunctionName, safeArguments);
         }
+
+        if (!functionFilter.test(publication(definition))) {
+            return failure(
+                    callId,
+                    safeFunctionName,
+                    safeArguments,
+                    SCOPE_DENIED_ERROR_CODE,
+                    "Function '" + safeFunctionName + "' is outside this catalog view."
+            );
+        }
+
+        return catalog.invokeResult(callId, safeFunctionName, safeArguments);
     }
 
     private AIFunctionInvocationResult controlFailure(
