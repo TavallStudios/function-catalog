@@ -96,6 +96,33 @@ class AIFunctionMcpToolPublisherTest {
         );
     }
 
+    @Test
+    void preservesCanonicalErrorEnvelopeWhenSuccessProjectionDoesNotApply() {
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+        catalog.registerInstances(new FailureFunctions());
+        AIFunctionMcpToolPublisher.ToolPresentation projection =
+                new AIFunctionMcpToolPublisher.ToolPresentation("", Map.of(), "/data");
+
+        var specification = new AIFunctionMcpToolPublisher(objectMapper)
+                .toolSpecifications(catalog, Map.of("chatgpt_fail", projection))
+                .stream()
+                .filter(candidate -> candidate.tool().name().equals("chatgpt_fail"))
+                .findFirst()
+                .orElseThrow();
+        McpSchema.CallToolResult result = specification.callHandler().apply(
+                null,
+                new McpSchema.CallToolRequest("chatgpt_fail", Map.of())
+        );
+
+        assertThat(result.isError()).isTrue();
+        assertThat(result.structuredContent()).isInstanceOf(Map.class);
+        assertThat(result.content().getFirst()).isInstanceOfSatisfying(
+                McpSchema.TextContent.class,
+                text -> assertThat(text.text()).contains("\"message\":\"boom\"")
+        );
+    }
+
     private static final class TestFunctions {
         @AIFunction(name = "chatgpt_status", description = "Visible ChatGPT capability")
         String chatGPTStatus() {
@@ -118,6 +145,13 @@ class AIFunctionMcpToolPublisherTest {
         @AIFunction(name = "internal_reconcile", description = "Internal-only capability")
         String internalReconcile() {
             return "ok";
+        }
+    }
+
+    private static final class FailureFunctions {
+        @AIFunction(name = "chatgpt_fail", description = "Failing ChatGPT capability")
+        String fail() {
+            throw new IllegalStateException("boom");
         }
     }
 }

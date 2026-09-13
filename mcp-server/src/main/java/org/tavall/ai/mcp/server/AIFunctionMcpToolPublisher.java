@@ -153,7 +153,13 @@ public final class AIFunctionMcpToolPublisher {
             }
         }
 
-        JsonNode textPayload = resolveTextPayload(structuredPayload, textContentJsonPointer);
+        // A failed catalog invocation returns the canonical error envelope rather
+        // than the successful function's projected payload. Applying a success
+        // projection such as /data to that envelope would mask the real error
+        // with a secondary "pointer did not resolve" failure at the MCP edge.
+        JsonNode textPayload = result.isError()
+                ? structuredPayload
+                : resolveTextPayload(structuredPayload, textContentJsonPointer);
         content.addFirst(new McpSchema.TextContent(writeJson(textPayload)));
         return new McpSchema.CallToolResult(
                 List.copyOf(content),
