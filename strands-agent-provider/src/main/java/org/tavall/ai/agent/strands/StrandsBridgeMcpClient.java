@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Lifecycle owner for the Java -> standalone Strands MCP connection. */
@@ -29,6 +30,8 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
     public static final String CLOSE_AGENT_TOOL = "strands_agent_close";
 
     private static final Logger LOGGER = LoggerFactory.getLogger(StrandsBridgeMcpClient.class);
+    /** The MCP SDK has a 20-second default; zero in the product contract means no practical deadline. */
+    private static final Duration NO_PRACTICAL_REQUEST_TIMEOUT = Duration.ofDays(36_500);
 
     private final StrandsAgentProviderConfiguration configuration;
     private final ObjectMapper objectMapper;
@@ -212,11 +215,12 @@ public final class StrandsBridgeMcpClient implements AutoCloseable {
             );
             transport.setStdErrorHandler(message -> LOGGER.info("[strands-bridge] {}", message));
 
+            Duration requestTimeout = configuration.requestTimeout().isZero()
+                    ? NO_PRACTICAL_REQUEST_TIMEOUT
+                    : configuration.requestTimeout();
             var clientBuilder = McpClient.sync(transport)
-                    .initializationTimeout(configuration.initializationTimeout());
-            if (!configuration.requestTimeout().isZero()) {
-                clientBuilder.requestTimeout(configuration.requestTimeout());
-            }
+                    .initializationTimeout(configuration.initializationTimeout())
+                    .requestTimeout(requestTimeout);
             McpSyncClient created = clientBuilder.build();
             try {
                 created.initialize();
