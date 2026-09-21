@@ -144,6 +144,30 @@ class RepositoryStagingFunctionsTest {
     }
 
     @Test
+    void metadataParserPreservesTheGenerationTwoMarkerDuringStateChanges() {
+        String original = "<!-- tavall-staging:v2 -->\n"
+                + "Type: RUNTIME_INTEGRATION\n"
+                + "Lifecycle: PERSISTENT_GENERATION\n"
+                + "State: ACTIVE\n"
+                + "Branch: staging/runtime-web\n"
+                + "Parent: main\n"
+                + "Promotion: MANUAL\n"
+                + "ChildMergeTarget: staging/runtime-web\n"
+                + "RuntimeId: tavall-web\n"
+                + "RuntimeStack: tavall-web\n"
+                + "FanInMode: SNAPSHOT_NON_CLOSING\n"
+                + "Generation: 2\n";
+
+        StagingMetadataDocument parsed = StagingMetadataDocument.parse(original);
+
+        assertThat(parsed.metadata()).isPresent();
+        assertThat(parsed.withState(StagingState.FROZEN))
+                .startsWith("<!-- tavall-staging:v2 -->")
+                .contains("Lifecycle: PERSISTENT_GENERATION")
+                .contains("Generation: 2");
+    }
+
+    @Test
     void resolveBasePreservesExistingFeatureStackBeforeChoosingStaging() {
         RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
         FakeProvider provider = new FakeProvider(List.of(

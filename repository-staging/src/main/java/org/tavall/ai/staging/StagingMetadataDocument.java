@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public final class StagingMetadataDocument {
     public static final String MARKER = "<!-- tavall-staging:v1 -->";
     private static final Pattern MARKER_LINE = Pattern.compile(
-            "(?m)^" + Pattern.quote(MARKER) + "(?:\\r?\\n|$)"
+            "(?m)^(<!-- tavall-staging:v[12] -->)(?:\\r?\\n|$)"
     );
     private static final Pattern FIELD_LINE = Pattern.compile(
             "([A-Za-z][A-Za-z0-9]*):[ \\t]*([^\\r\\n]*)(?:\\r?\\n|$)"
@@ -34,6 +34,7 @@ public final class StagingMetadataDocument {
     );
 
     private final String body;
+    private final String marker;
     private final Optional<StagingMetadata> metadata;
     private final int blockStart;
     private final int blockEnd;
@@ -41,12 +42,14 @@ public final class StagingMetadataDocument {
 
     private StagingMetadataDocument(
             String body,
+            String marker,
             Optional<StagingMetadata> metadata,
             int blockStart,
             int blockEnd,
             boolean malformed
     ) {
         this.body = body;
+        this.marker = marker;
         this.metadata = metadata;
         this.blockStart = blockStart;
         this.blockEnd = blockEnd;
@@ -59,6 +62,7 @@ public final class StagingMetadataDocument {
         if (!markerMatcher.find()) {
             return new StagingMetadataDocument(
                     safeBody,
+                    MARKER,
                     Optional.empty(),
                     -1,
                     -1,
@@ -89,7 +93,14 @@ public final class StagingMetadataDocument {
                 "ChildMergeTarget"
         );
         if (!fields.keySet().containsAll(required)) {
-            return new StagingMetadataDocument(safeBody, Optional.empty(), markerMatcher.start(), blockEnd, true);
+            return new StagingMetadataDocument(
+                    safeBody,
+                    markerMatcher.group(1),
+                    Optional.empty(),
+                    markerMatcher.start(),
+                    blockEnd,
+                    true
+            );
         }
 
         try {
@@ -110,13 +121,21 @@ public final class StagingMetadataDocument {
             );
             return new StagingMetadataDocument(
                     safeBody,
+                    markerMatcher.group(1),
                     Optional.of(metadata),
                     markerMatcher.start(),
                     blockEnd,
                     false
             );
         } catch (RuntimeException exception) {
-            return new StagingMetadataDocument(safeBody, Optional.empty(), markerMatcher.start(), blockEnd, true);
+            return new StagingMetadataDocument(
+                    safeBody,
+                    markerMatcher.group(1),
+                    Optional.empty(),
+                    markerMatcher.start(),
+                    blockEnd,
+                    true
+            );
         }
     }
 
@@ -148,7 +167,7 @@ public final class StagingMetadataDocument {
     }
 
     public String replace(StagingMetadata replacement) {
-        String rendered = render(replacement);
+        String rendered = render(replacement, marker);
         if (blockStart < 0) {
             return rendered + (body.isBlank() ? "" : "\n\n" + body);
         }
@@ -156,8 +175,12 @@ public final class StagingMetadataDocument {
     }
 
     public static String render(StagingMetadata metadata) {
+        return render(metadata, MARKER);
+    }
+
+    private static String render(StagingMetadata metadata, String marker) {
         ArrayList<String> lines = new ArrayList<>();
-        lines.add(MARKER);
+        lines.add(marker);
         lines.add("Type: " + metadata.type().name());
         add(lines, "Lifecycle", metadata.lifecycle());
         lines.add("State: " + metadata.state().name());
