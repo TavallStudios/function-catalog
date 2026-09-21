@@ -113,6 +113,37 @@ class RepositoryStagingFunctionsTest {
     }
 
     @Test
+    void metadataParserAcceptsPersistentRuntimeFieldsAndPreservesThemOnStateChanges() {
+        String original = "Intro\n\n<!-- tavall-staging:v1 -->\n"
+                + "Type: COMBINED_RUNTIME_INTEGRATION\n"
+                + "Lifecycle: PERSISTENT\n"
+                + "State: ACTIVE\n"
+                + "Branch: stabilize/full-runtime-build\n"
+                + "Parent: main\n"
+                + "Promotion: MANUAL\n"
+                + "ChildMergeTarget: stabilize/full-runtime-build\n"
+                + "RuntimeId: NONE\n"
+                + "RuntimeStack: tavall-project-novus\n"
+                + "FanInMode: SNAPSHOT_NON_CLOSING\n"
+                + "RuntimeFlags: PAPER=ENABLED;WEB=MIGRATING_TO_TAVALL_WEB\n"
+                + "ArchitectureProfile: architecture-combined\n"
+                + "ArchitectureCheck: tavall-ci/manual/architecture-combined\n\n"
+                + "Details after metadata.\n";
+
+        StagingMetadataDocument parsed = StagingMetadataDocument.parse(original);
+
+        assertThat(parsed.metadata()).isPresent();
+        assertThat(parsed.metadata().orElseThrow().lifecycle()).contains("PERSISTENT");
+        assertThat(parsed.metadata().orElseThrow().runtimeStack()).contains("tavall-project-novus");
+        assertThat(parsed.metadata().orElseThrow().fanInMode()).contains("SNAPSHOT_NON_CLOSING");
+        assertThat(parsed.withState(StagingState.FROZEN))
+                .contains("Lifecycle: PERSISTENT")
+                .contains("RuntimeFlags: PAPER=ENABLED;WEB=MIGRATING_TO_TAVALL_WEB")
+                .contains("ArchitectureCheck: tavall-ci/manual/architecture-combined")
+                .contains("Details after metadata.");
+    }
+
+    @Test
     void resolveBasePreservesExistingFeatureStackBeforeChoosingStaging() {
         RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
         FakeProvider provider = new FakeProvider(List.of(
