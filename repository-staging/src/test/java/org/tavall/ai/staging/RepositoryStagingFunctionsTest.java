@@ -9,8 +9,65 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RepositoryStagingFunctionsTest {
+    @Test
+    void creationValidatesAncestryBeforeAnyProviderWrite() {
+        var repository = new RepositoryCoordinates("TavallStudios", "example");
+        var provider = new FakeProvider(List.of(pull(10, "staging", "staging/runtime", "main", stagingBody())));
+        provider.mutationHead = "a".repeat(40);
+        var service = new RepositoryStagingService(provider);
+        assertThatThrownBy(() -> service.createPullRequest(new CreateStagedPullRequestRequest(
+                repository, "feature", "body", "working/feature", provider.mutationHead, "main", true)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Invalid staging topology");
+        assertThat(provider.writes).isZero();
+        assertThatThrownBy(() -> service.createPullRequest(new CreateStagedPullRequestRequest(
+                repository, "feature", "body", "working/feature", "b".repeat(40), "staging/runtime", true)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("STALE_SOURCE");
+        assertThat(provider.writes).isZero();
+        var created = service.createPullRequest(new CreateStagedPullRequestRequest(
+                repository, "feature", "body", "working/feature", provider.mutationHead, "staging/runtime", true));
+        assertThat(created.baseBranch()).isEqualTo("staging/runtime");
+        assertThat(provider.writes).isEqualTo(1);
+        assertThat(service.validate(new RepositoryStagingRequest(repository)).valid()).isTrue();
+    }
+
+    @Test
+    void updateCannotRemoveStagingMetadataOrFlattenAnOpenDependency() {
+        var repository = new RepositoryCoordinates("TavallStudios", "example");
+        String head = "a".repeat(40);
+        var provider = new FakeProvider(List.of(
+                new RepositoryPullRequest(10, "staging", stagingBody(), "staging/runtime", head, "main", head, true),
+                new RepositoryPullRequest(20, "parent", "", "working/parent", head, "staging/runtime", head, true),
+                new RepositoryPullRequest(21, "child", "", "working/child", head, "working/parent", head, true)));
+        var service = new RepositoryStagingService(provider);
+        assertThatThrownBy(() -> service.updatePullRequest(new UpdateStagedPullRequestRequest(
+                repository, 10, head, Optional.empty(), Optional.of("removed metadata"))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Invalid staging topology");
+        assertThatThrownBy(() -> service.updatePullRequest(new UpdateStagedPullRequestRequest(
+                repository, 21, head, Optional.of("staging/runtime"), Optional.empty())))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Preserve the open feature dependency");
+        assertThat(provider.writes).isZero();
+        var updated = service.updatePullRequest(new UpdateStagedPullRequestRequest(
+                repository, 21, head, Optional.empty(), Optional.of("updated description")));
+        assertThat(updated.body()).isEqualTo("updated description");
+        assertThat(updated.baseBranch()).isEqualTo("working/parent");
+    }
+
+    @Test
+    void postPublicationDriftReturnsAnExplicitRecoveryStateWithTheCreatedPr() {
+        var repository = new RepositoryCoordinates("TavallStudios", "example");
+        var provider = new FakeProvider(List.of(pull(10, "staging", "staging/runtime", "main", stagingBody())));
+        provider.mutationHead = "a".repeat(40);
+        provider.driftAfterCreate = true;
+        assertThatThrownBy(() -> new RepositoryStagingService(provider).createPullRequest(
+                new CreateStagedPullRequestRequest(repository, "feature", "body", "working/feature",
+                        provider.mutationHead, "staging/runtime", true)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("RECOVERY_REQUIRED: published PR #99");
+        assertThat(provider.writes).isEqualTo(1);
+    }
+
     @Test
     void registrarPublishesCanonicalRepositoryStagingFunctions() {
         AIFunctionCatalog catalog = new AIFunctionCatalog(new ObjectMapper().findAndRegisterModules());
@@ -56,6 +113,61 @@ class RepositoryStagingFunctionsTest {
     }
 
     @Test
+    void metadataParserAcceptsPersistentRuntimeFieldsAndPreservesThemOnStateChanges() {
+        String original = "Intro\n\n<!-- tavall-staging:v1 -->\n"
+                + "Type: COMBINED_RUNTIME_INTEGRATION\n"
+                + "Lifecycle: PERSISTENT\n"
+                + "State: ACTIVE\n"
+                + "Branch: stabilize/full-runtime-build\n"
+                + "Parent: main\n"
+                + "Promotion: MANUAL\n"
+                + "ChildMergeTarget: stabilize/full-runtime-build\n"
+                + "RuntimeId: NONE\n"
+                + "RuntimeStack: tavall-project-novus\n"
+                + "FanInMode: SNAPSHOT_NON_CLOSING\n"
+                + "RuntimeFlags: PAPER=ENABLED;WEB=MIGRATING_TO_TAVALL_WEB\n"
+                + "ArchitectureProfile: architecture-combined\n"
+                + "ArchitectureCheck: tavall-ci/manual/architecture-combined\n\n"
+                + "Details after metadata.\n";
+
+        StagingMetadataDocument parsed = StagingMetadataDocument.parse(original);
+
+        assertThat(parsed.metadata()).isPresent();
+        assertThat(parsed.metadata().orElseThrow().lifecycle()).contains("PERSISTENT");
+        assertThat(parsed.metadata().orElseThrow().runtimeStack()).contains("tavall-project-novus");
+        assertThat(parsed.metadata().orElseThrow().fanInMode()).contains("SNAPSHOT_NON_CLOSING");
+        assertThat(parsed.withState(StagingState.FROZEN))
+                .contains("Lifecycle: PERSISTENT")
+                .contains("RuntimeFlags: PAPER=ENABLED;WEB=MIGRATING_TO_TAVALL_WEB")
+                .contains("ArchitectureCheck: tavall-ci/manual/architecture-combined")
+                .contains("Details after metadata.");
+    }
+
+    @Test
+    void metadataParserPreservesTheGenerationTwoMarkerDuringStateChanges() {
+        String original = "<!-- tavall-staging:v2 -->\n"
+                + "Type: RUNTIME_INTEGRATION\n"
+                + "Lifecycle: PERSISTENT_GENERATION\n"
+                + "State: ACTIVE\n"
+                + "Branch: staging/runtime-web\n"
+                + "Parent: main\n"
+                + "Promotion: MANUAL\n"
+                + "ChildMergeTarget: staging/runtime-web\n"
+                + "RuntimeId: tavall-web\n"
+                + "RuntimeStack: tavall-web\n"
+                + "FanInMode: SNAPSHOT_NON_CLOSING\n"
+                + "Generation: 2\n";
+
+        StagingMetadataDocument parsed = StagingMetadataDocument.parse(original);
+
+        assertThat(parsed.metadata()).isPresent();
+        assertThat(parsed.withState(StagingState.FROZEN))
+                .startsWith("<!-- tavall-staging:v2 -->")
+                .contains("Lifecycle: PERSISTENT_GENERATION")
+                .contains("Generation: 2");
+    }
+
+    @Test
     void resolveBasePreservesExistingFeatureStackBeforeChoosingStaging() {
         RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
         FakeProvider provider = new FakeProvider(List.of(
@@ -80,7 +192,7 @@ class RepositoryStagingFunctionsTest {
     }
 
     @Test
-    void validateWarnsAboutDirectToMainWorkWithoutMakingIntentionalHotfixTopologyInvalid() {
+    void validateRejectsDirectToMainWorkWithoutStagingAncestry() {
         RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
         FakeProvider provider = new FakeProvider(List.of(
                 pull(10, "Runtime: Staging PR — Example", "staging/runtime", "main", stagingBody()),
@@ -90,12 +202,48 @@ class RepositoryStagingFunctionsTest {
         StagingValidationResult result = new RepositoryStagingService(provider)
                 .validate(new RepositoryStagingRequest(repository));
 
-        assertThat(result.valid()).isTrue();
+        assertThat(result.valid()).isFalse();
         assertThat(result.findings())
                 .filteredOn(finding -> finding.code().equals("DIRECT_TO_MAIN_WITH_ACTIVE_STAGING"))
                 .singleElement()
                 .extracting(StagingTopologyFinding::severity)
-                .isEqualTo(StagingFindingSeverity.WARNING);
+                .isEqualTo(StagingFindingSeverity.ERROR);
+    }
+
+    @Test
+    void validateRejectsAStackWhoseRootHasNoStagingPath() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(40, "stack root", "working/root", "main", "feature"),
+                pull(41, "stack child", "working/child", "working/root", "feature")
+        ));
+
+        StagingValidationResult result = new RepositoryStagingService(provider)
+                .validate(new RepositoryStagingRequest(repository));
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.findings())
+                .filteredOn(finding -> finding.code().equals("PR_WITHOUT_STAGING_ANCESTRY"))
+                .extracting(StagingTopologyFinding::pullRequestNumber)
+                .containsExactlyInAnyOrder(40, 41);
+    }
+
+    @Test
+    void validateRejectsAnOrphanSubStagingPullRequest() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(70, "Domain staging", "staging/domain", "main", domainStagingBody())
+        ));
+
+        StagingValidationResult result = new RepositoryStagingService(provider)
+                .validate(new RepositoryStagingRequest(repository));
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.findings())
+                .filteredOn(finding -> finding.code().equals("SUB_STAGING_WITHOUT_ACTIVE_PARENT"))
+                .singleElement()
+                .extracting(StagingTopologyFinding::severity)
+                .isEqualTo(StagingFindingSeverity.ERROR);
     }
 
     @Test
@@ -113,6 +261,50 @@ class RepositoryStagingFunctionsTest {
         assertThat(result.attached()).isTrue();
         assertThat(provider.pullRequests.get(40).baseBranch()).isEqualTo("staging/runtime");
         assertThat(provider.pullRequests.get(41).baseBranch()).isEqualTo("working/root");
+    }
+
+    @Test
+    void attachRejectsFrozenTargets() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(10, "Frozen staging", "staging/runtime", "main", frozenStagingBody()),
+                pull(40, "stack root", "working/root", "main", "feature")
+        ));
+
+        assertThatThrownBy(() -> new RepositoryStagingService(provider)
+                .attach(new AttachStagingPullRequestRequest(repository, 40, 10)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ACTIVE");
+    }
+
+    @Test
+    void attachRewritesStagingMetadataParentAlongsidePullRequestBase() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(10, "Runtime staging", "staging/runtime", "main", stagingBody()),
+                pull(40, "Domain staging", "staging/domain", "main", domainStagingBody())
+        ));
+
+        StagingAttachResult result = new RepositoryStagingService(provider)
+                .attach(new AttachStagingPullRequestRequest(repository, 40, 10));
+
+        assertThat(result.attached()).isTrue();
+        assertThat(provider.pullRequests.get(40).baseBranch()).isEqualTo("staging/runtime");
+        assertThat(provider.pullRequests.get(40).body()).contains("Parent: staging/runtime");
+    }
+
+    @Test
+    void supersedingAStagingPullRequestWithOpenDescendantsIsRejected() {
+        RepositoryCoordinates repository = new RepositoryCoordinates("TavallStudios", "example");
+        FakeProvider provider = new FakeProvider(List.of(
+                pull(10, "Runtime staging", "staging/runtime", "main", stagingBody()),
+                pull(40, "attached root", "working/root", "staging/runtime", "feature")
+        ));
+
+        assertThatThrownBy(() -> new RepositoryStagingService(provider)
+                .setState(new SetStagingStateRequest(repository, 10, StagingState.SUPERSEDED)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("open descendants");
     }
 
     @Test
@@ -144,9 +336,17 @@ class RepositoryStagingFunctionsTest {
         return stagingBody().replace("State: ACTIVE", "State: FROZEN");
     }
 
+    private static String domainStagingBody() {
+        return "<!-- tavall-staging:v1 -->\nType: DOMAIN_INTEGRATION\nState: ACTIVE\n"
+                + "Branch: staging/domain\nParent: main\nPromotion: MANUAL\nChildMergeTarget: staging/domain\n";
+    }
+
     private static final class FakeProvider implements RepositoryStagingProvider {
         private final Map<Integer, RepositoryPullRequest> pullRequests = new java.util.LinkedHashMap<>();
         private List<RepositoryCheck> checks = List.of();
+        private String mutationHead;
+        private int writes;
+        private boolean driftAfterCreate;
 
         private FakeProvider() {
         }
@@ -162,7 +362,7 @@ class RepositoryStagingFunctionsTest {
 
         @Override
         public Optional<String> branchHead(RepositoryCoordinates repository, String branch) {
-            return Optional.of(branch + "-sha");
+            return Optional.of(mutationHead == null ? branch + "-sha" : mutationHead);
         }
 
         @Override
@@ -179,6 +379,11 @@ class RepositoryStagingFunctionsTest {
                 boolean draft
         ) {
             RepositoryPullRequest created = pull(99, title, headBranch, baseBranch, body);
+            writes++;
+            if (mutationHead != null) {
+                created = new RepositoryPullRequest(99, title, body, headBranch, mutationHead,
+                        driftAfterCreate ? "main" : baseBranch, mutationHead, draft);
+            }
             pullRequests.put(created.number(), created);
             return created;
         }
@@ -191,6 +396,7 @@ class RepositoryStagingFunctionsTest {
                 Optional<String> body
         ) {
             RepositoryPullRequest old = pullRequests.get(pullRequestNumber);
+            writes++;
             RepositoryPullRequest updated = new RepositoryPullRequest(
                     old.number(),
                     old.title(),
