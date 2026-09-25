@@ -1,0 +1,51 @@
+version: 2
+
+source:
+  repository: TavallStudios/function-catalog
+  provider: github
+
+build:
+  type: gradle
+  java: 25
+  gradle: 9.6.1
+
+resources:
+  mode: SYSTEM
+
+requiredChecks:
+  - quality
+  - integration
+
+checks:
+  quality:
+    executor: gradle
+    tasks:
+      - "clean"
+      - ":gemini-sdk:clean"
+      - ":ai-core:clean"
+      - ":agent-runtime:clean"
+      - ":codex-agent-provider:clean"
+      - ":openai-sdk:clean"
+      - ":claude-sdk:clean"
+      - ":mcp-server:clean"
+      - "check"
+      - ":gemini-sdk:check"
+      - ":ai-core:check"
+      - ":agent-runtime:check"
+      - ":codex-agent-provider:check"
+      - ":openai-sdk:check"
+      - ":claude-sdk:check"
+      - ":mcp-server:check"
+      - "assemble"
+      - ":gemini-sdk:assemble"
+      - ":ai-core:assemble"
+      - ":agent-runtime:assemble"
+      - ":codex-agent-provider:assemble"
+      - ":openai-sdk:assemble"
+      - ":claude-sdk:assemble"
+      - ":mcp-server:assemble"
+
+  integration:
+    executor: gradle
+    tasks:
+      - ":mcp-server:integrationTest"
