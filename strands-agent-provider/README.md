@@ -1,25 +1,25 @@
-# agent-runtime
+# strands-agent-provider
 
-Owns provider-neutral execution for an agent/job, including function-view resolution, execution budgets, timeouts, cancellation, and result reporting.
+Implements the agent-runtime provider boundary for the Strands bridge, with MCP tool references, invocation limits, and observed events.
 
 ## Responsibility
 
 ### Owns
-- Agent definitions, job requests, execution budgets/results, and provider-neutral lifecycle.
-- Fail-closed function-view narrowing, invocation counting, timeout, and view revocation.
+- Strands provider invocation and MCP bridge integration.
+- Provider limits and normalized tool results/events.
 
 ### Does Not Own
-- A long-lived worker process or independent deployment.
-- Provider-specific process/API behavior, machine placement, or Cloud authorization.
+- The shared runtime/catalog or Tavall Cloud deployment boundary.
+- A standalone Strands server.
 
 ## Repository Structure
 
 function-catalog/
 ├── [`gemini-sdk`](../gemini-sdk/README.md)
 ├── [`ai-core`](../ai-core/README.md)
-├── **[`agent-runtime`](README.md) ← This Module**
+├── [`agent-runtime`](../agent-runtime/README.md)
 ├── [`codex-agent-provider`](../codex-agent-provider/README.md)
-├── [`strands-agent-provider`](../strands-agent-provider/README.md)
+├── **[`strands-agent-provider`](README.md) ← This Module**
 ├── [`openai-sdk`](../openai-sdk/README.md)
 ├── [`claude-sdk`](../claude-sdk/README.md)
 └── [`mcp-server`](../mcp-server/README.md)
@@ -28,9 +28,8 @@ function-catalog/
 
 | Module / System | Relationship |
 | --- | --- |
-| [`ai-core`](../ai-core/README.md) | Resolves the exact catalog view supplied to a job. |
-| [`codex-agent-provider`](../codex-agent-provider/README.md) | Implements the provider interface. |
-| [`strands-agent-provider`](../strands-agent-provider/README.md) | Implements the provider interface. |
+| [`agent-runtime`](../agent-runtime/README.md) | Implements the provider interface consumed by the runtime. |
+| [`mcp-server`](../mcp-server/README.md) | Shares MCP protocol concerns without owning the catalog server. |
 
 ## Documentation
 
@@ -42,12 +41,12 @@ function-catalog/
 
 > This module is not independently deployed.
 
-No independent runtime owner or Deployment record applies to this integration.
+Runtime owner: [`agent-runtime`](../agent-runtime/README.md). No Deployment record applies to this provider boundary.
 
 ## Development
 
-- **Module Type:** `LIBRARY`
-- **Runtime:** `None`
+- **Module Type:** `PROVIDER`
+- **Runtime:** `agent-runtime`
 - **Current PR Stack:** [mainline integration #10](https://github.com/TavallStudios/function-catalog/pull/10), [runtime/provider ownership proposal #13](https://github.com/TavallStudios/function-catalog/pull/13); documentation update: __PR_LINK__.
 - Shared contribution policy: [Tavall Docs Git Workflow](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/GIT_WORKFLOW.md).
 
@@ -59,13 +58,13 @@ No independent runtime owner or Deployment record applies to this integration.
 
 | Surface | Sync State | Location | Last Updated | Evidence |
 | --- | --- | --- | --- | --- |
-| GitHub | `PRIMARY` | `TavallStudios/function-catalog/agent-runtime/README.md` | 2026-09-27 12:51 PM PDT | __PR_URL__ |
+| GitHub | `PRIMARY` | `TavallStudios/function-catalog/strands-agent-provider/README.md` | 2026-09-27 12:51 PM PDT | __PR_URL__ |
 | Notion | `NOT_APPLICABLE` | — | 2026-09-27 12:51 PM PDT | README routing surface; no 1:1 twin is assigned. |
 
 ### Update History
 
 | Timestamp | Surface | Event | Location | Previous Location | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-27 12:51 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/agent-runtime/README.md` | `TavallStudios/function-catalog/agent-runtime/README.md` | __PR_URL__ | Canonicalized module ownership, runtime, and current PR routing. |
+| 2026-09-27 12:51 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/strands-agent-provider/README.md` | `TavallStudios/function-catalog/strands-agent-provider/README.md` | __PR_URL__ | Canonicalized module ownership, runtime, and current PR routing. |
 
 </details>

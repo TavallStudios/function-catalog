@@ -1,25 +1,26 @@
-# openai-sdk
+# gemini-sdk
 
-Owns the OpenAI Java client wrapper and function-call/result adaptation used by callers.
+Owns Java Gemini 3 text/image client wrappers, response models, model/API enums, and response parsing helpers.
 
 ## Responsibility
 
 ### Owns
-- OpenAI client integration and tool/function-call translation.
+- Gemini API client integration and response types.
+- Gemini-specific model/version selection and parsing helpers.
 
 ### Does Not Own
-- Provider-neutral agent execution or Tavall function definitions.
-- Application-level provider selection or deployment.
+- Tavall's shared function catalog or provider-neutral agent execution.
+- A long-lived application or model-hosting service.
 
 ## Repository Structure
 
 function-catalog/
-├── [`gemini-sdk`](../gemini-sdk/README.md)
+├── **[`gemini-sdk`](README.md) ← This Module**
 ├── [`ai-core`](../ai-core/README.md)
 ├── [`agent-runtime`](../agent-runtime/README.md)
 ├── [`codex-agent-provider`](../codex-agent-provider/README.md)
 ├── [`strands-agent-provider`](../strands-agent-provider/README.md)
-├── **[`openai-sdk`](README.md) ← This Module**
+├── [`openai-sdk`](../openai-sdk/README.md)
 ├── [`claude-sdk`](../claude-sdk/README.md)
 └── [`mcp-server`](../mcp-server/README.md)
 
@@ -27,8 +28,8 @@ function-catalog/
 
 | Module / System | Relationship |
 | --- | --- |
-| [`ai-core`](../ai-core/README.md) | Translates catalog functions to OpenAI tool-call representations. |
-| [`agent-runtime`](../agent-runtime/README.md) | Can be composed by a caller where an OpenAI provider is selected. |
+| [`ai-core`](../ai-core/README.md) | The Gemini client surface is separate from the shared catalog contract. |
+| [`agent-runtime`](../agent-runtime/README.md) | A caller may compose provider integrations with the agent execution library. |
 
 ## Documentation
 
@@ -55,13 +56,13 @@ No independent runtime owner or Deployment record applies to this integration.
 
 | Surface | Sync State | Location | Last Updated | Evidence |
 | --- | --- | --- | --- | --- |
-| GitHub | `PRIMARY` | `TavallStudios/function-catalog/openai-sdk/README.md` | 2026-09-27 12:51 PM PDT | __PR_URL__ |
+| GitHub | `PRIMARY` | `TavallStudios/function-catalog/gemini-sdk/README.md` | 2026-09-27 12:51 PM PDT | __PR_URL__ |
 | Notion | `NOT_APPLICABLE` | — | 2026-09-27 12:51 PM PDT | README routing surface; no 1:1 twin is assigned. |
 
 ### Update History
 
 | Timestamp | Surface | Event | Location | Previous Location | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-27 12:51 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/openai-sdk/README.md` | `TavallStudios/function-catalog/openai-sdk/README.md` | __PR_URL__ | Canonicalized module ownership, runtime, and current PR routing. |
+| 2026-09-27 12:51 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/gemini-sdk/README.md` | `TavallStudios/function-catalog/gemini-sdk/README.md` | __PR_URL__ | Canonicalized module ownership, runtime, and current PR routing. |
 
 </details>
