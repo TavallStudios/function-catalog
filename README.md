@@ -74,13 +74,13 @@ No license file is currently tracked. Contact the maintainers before redistribut
 
 | Surface | Sync State | Location | Last Updated | Evidence |
 | --- | --- | --- | --- | --- |
-| GitHub | `PRIMARY` | `TavallStudios/function-catalog/README.md` | 2026-09-27 12:51 PM PDT | __PR_URL__ |
-| Notion | `NOT_APPLICABLE` | — | 2026-09-27 12:51 PM PDT | README routing surface; no 1:1 twin is assigned. |
+| GitHub | `PRIMARY` | `TavallStudios/function-catalog/README.md` | 2026-09-27 12:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
+| Notion | `NOT_APPLICABLE` | — | 2026-09-27 12:59 PM PDT | README routing surface; no 1:1 twin is assigned. |
 
 ### Update History
 
 | Timestamp | Surface | Event | Location | Previous Location | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-27 12:51 PM PDT | GitHub | `CREATED` | `TavallStudios/function-catalog/README.md` | — | __PR_URL__ | Added a public project front door and source-backed module map. |
+| 2026-09-27 12:59 PM PDT | GitHub | `CREATED` | `TavallStudios/function-catalog/README.md` | — | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Added a public project front door and source-backed module map. |
 
 </details>

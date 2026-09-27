@@ -39,13 +39,13 @@ This repository documents an executable server boundary but not a deployed endpo
 
 | Surface | Sync State | Location | Last Updated | Evidence |
 | --- | --- | --- | --- | --- |
-| GitHub | `PRIMARY` | `TavallStudios/function-catalog/TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md` | 2026-09-27 12:51 PM PDT | __PR_URL__ |
-| Notion | `TEMPORARY_DRIFT` | — | 2026-09-27 12:51 PM PDT | GitHub-only task boundary; reconcile the required paired record before claiming 1:1 sync. |
+| GitHub | `PRIMARY` | `TavallStudios/function-catalog/TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md` | 2026-09-27 12:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
+| Notion | `TEMPORARY_DRIFT` | — | 2026-09-27 12:59 PM PDT | GitHub-only task boundary; reconcile the required paired record before claiming 1:1 sync. |
 
 ### Update History
 
 | Timestamp | Surface | Event | Location | Previous Location | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-27 12:51 PM PDT | GitHub | `CREATED` | `TavallStudios/function-catalog/TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md` | — | __PR_URL__ | Created a deployment record without inventing a target, source, timestamp, or history. |
+| 2026-09-27 12:59 PM PDT | GitHub | `CREATED` | `TavallStudios/function-catalog/TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md` | — | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Created a deployment record without inventing a target, source, timestamp, or history. |
 
 </details>
