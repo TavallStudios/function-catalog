@@ -1,40 +1,41 @@
-# claude-sdk
+# gemini-sdk
 
-Owns the Anthropic Java client wrapper and tool-call/result adaptation used by callers.
+Owns Java Gemini 3 text/image client wrappers, response models, model/API enums, and response parsing helpers.
 
 ## Responsibility
 
 ### Owns
-- Anthropic client integration, tool adapter/parser, and result types.
+- Gemini API client integration and response types.
+- Gemini-specific model/version selection and parsing helpers.
 
 ### Does Not Own
-- Provider-neutral agent execution or Tavall function definitions.
-- Application-level provider selection or deployment.
+- Tavall's shared function catalog or provider-neutral agent execution.
+- A long-lived application or model-hosting service.
 
 ## Repository Structure
 
 function-catalog/
-├── [`gemini-sdk`](../gemini-sdk/README.md)
+├── **[`gemini-sdk`](README.md) ← This Module**
 ├── [`ai-core`](../ai-core/README.md)
 ├── [`agent-runtime`](../agent-runtime/README.md)
 ├── [`codex-agent-provider`](../codex-agent-provider/README.md)
 ├── [`strands-agent-provider`](../strands-agent-provider/README.md)
 ├── [`openai-sdk`](../openai-sdk/README.md)
-├── **[`claude-sdk`](README.md) ← This Module**
+├── [`claude-sdk`](../claude-sdk/README.md)
 └── [`mcp-server`](../mcp-server/README.md)
 
 ## Relationships
 
 | Module / System | Relationship |
 | --- | --- |
-| [`ai-core`](../ai-core/README.md) | Translates catalog functions to Anthropic tool-call representations. |
-| [`agent-runtime`](../agent-runtime/README.md) | Can be composed by a caller where an Anthropic provider is selected. |
+| [`ai-core`](../ai-core/README.md) | The Gemini client surface is separate from the shared catalog contract. |
+| [`agent-runtime`](../agent-runtime/README.md) | A caller may compose provider integrations with the agent execution library. |
 
 ## Documentation
 
 | Type | Document | Purpose | Surface |
 | --- | --- | --- | --- |
-| Progression | [Claude Sdk Progression](../docs/progression/CLAUDE_SDK_PROGRESSION.md) | Module implementation, validation, and history. | GitHub |
+| Progression | [Gemini Sdk Progression](../docs/progression/GEMINI_SDK_PROGRESSION.md) | Module implementation, validation, and history. | GitHub |
 | Progression | [Function Catalog System Progression](../docs/progression/FUNCTION_CATALOG_SYSTEM_PROGRESSION.md) | Cross-module architecture and system acceptance. | GitHub |
 ## Deployment
 
@@ -49,7 +50,7 @@ No independent runtime owner or Deployment record applies to this integration.
 - **Current PR Stack:** [mainline integration #10](https://github.com/TavallStudios/function-catalog/pull/10); documentation update: [PR #37](https://github.com/TavallStudios/function-catalog/pull/37).
 - Shared contribution policy: [Tavall Docs Git Workflow](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/GIT_WORKFLOW.md).
 
-- **Progression:** [Module Progression](../docs/progression/CLAUDE_SDK_PROGRESSION.md) · [System Progression](../docs/progression/FUNCTION_CATALOG_SYSTEM_PROGRESSION.md).
+- **Progression:** [Module Progression](../docs/progression/GEMINI_SDK_PROGRESSION.md) · [System Progression](../docs/progression/FUNCTION_CATALOG_SYSTEM_PROGRESSION.md).
 - **Module CI:** Missing in audited main: `.tavallci/ci.yaml`.
 
 <details>
@@ -59,14 +60,14 @@ No independent runtime owner or Deployment record applies to this integration.
 
 | Surface | Sync State | Location | Last Updated | Evidence |
 | --- | --- | --- | --- | --- |
-| GitHub | `PRIMARY` | `TavallStudios/function-catalog/claude-sdk/README.md` | 2026-09-27 5:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
+| GitHub | `PRIMARY` | `TavallStudios/function-catalog/gemini-sdk/README.md` | 2026-09-27 5:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
 | Notion | `NOT_APPLICABLE` | — | 2026-09-27 12:59 PM PDT | README routing surface; no 1:1 twin is assigned. |
 
 ### Update History
 
 | Timestamp | Surface | Event | Location | Previous Location | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-09-27 12:59 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/claude-sdk/README.md` | `TavallStudios/function-catalog/claude-sdk/README.md` | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Canonicalized module ownership, runtime, and current PR routing. |
-| 2026-09-27 5:59 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/claude-sdk/README.md` | `TavallStudios/function-catalog/claude-sdk/README.md` | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Added module and System Progression routes and recorded module CI state. |
+| 2026-09-27 12:59 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/gemini-sdk/README.md` | `TavallStudios/function-catalog/gemini-sdk/README.md` | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Canonicalized module ownership, runtime, and current PR routing. |
+| 2026-09-27 5:59 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/gemini-sdk/README.md` | `TavallStudios/function-catalog/gemini-sdk/README.md` | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Added module and System Progression routes and recorded module CI state. |
 
 </details>
