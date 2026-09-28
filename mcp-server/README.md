@@ -36,6 +36,8 @@ function-catalog/
 | Type | Document | Purpose | Surface |
 | --- | --- | --- | --- |
 | Technical | [Function Catalog architecture](../docs/AGENT_FUNCTION_CATALOG_ARCHITECTURE.md) | Owns catalog functions, scoped views, and system boundaries. | GitHub |
+| Progression | [Mcp Server Progression](../docs/progression/MCP_SERVER_PROGRESSION.md) | Module implementation, validation, and history. | GitHub |
+| Progression | [Function Catalog System Progression](../docs/progression/FUNCTION_CATALOG_SYSTEM_PROGRESSION.md) | Cross-module architecture and system acceptance. | GitHub |
 
 ## Deployment
 
@@ -50,6 +52,8 @@ The module owns the independent MCP process. Its target and source are not estab
 - **Current PR Stack:** [mainline integration #10](https://github.com/TavallStudios/function-catalog/pull/10), [skill resource endpoint #29](https://github.com/TavallStudios/function-catalog/pull/29); documentation update: [PR #37](https://github.com/TavallStudios/function-catalog/pull/37).
 - Shared contribution policy: [Tavall Docs Git Workflow](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/GIT_WORKFLOW.md).
 
+- **Progression:** [Module Progression](../docs/progression/MCP_SERVER_PROGRESSION.md) · [System Progression](../docs/progression/FUNCTION_CATALOG_SYSTEM_PROGRESSION.md).
+- **Module CI:** Missing in audited main: `.tavallci/ci.yaml`.
 
 <details>
 <summary>Documentation Update State</summary>
@@ -58,7 +62,7 @@ The module owns the independent MCP process. Its target and source are not estab
 
 | Surface | Sync State | Location | Last Updated | Evidence |
 | --- | --- | --- | --- | --- |
-| GitHub | `PRIMARY` | `TavallStudios/function-catalog/mcp-server/README.md` | 2026-09-27 12:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
+| GitHub | `PRIMARY` | `TavallStudios/function-catalog/mcp-server/README.md` | 2026-09-27 5:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
 | Notion | `NOT_APPLICABLE` | — | 2026-09-27 12:59 PM PDT | README routing surface; no 1:1 twin is assigned. |
 
 ### Update History
@@ -66,5 +70,6 @@ The module owns the independent MCP process. Its target and source are not estab
 | Timestamp | Surface | Event | Location | Previous Location | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-09-27 12:59 PM PDT | GitHub | `CREATED` | `TavallStudios/function-catalog/mcp-server/README.md` | — | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Canonicalized module ownership, runtime, and current PR routing. |
+| 2026-09-27 5:59 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/mcp-server/README.md` | `TavallStudios/function-catalog/mcp-server/README.md` | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Added module and System Progression routes and recorded module CI state. |
 
 </details>
