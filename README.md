@@ -44,6 +44,7 @@ This repository does not document published dependency coordinates. Use JDK 25 a
 - [Agent runtime architecture](docs/TAVALL_AGENT_RUNTIME_ARCHITECTURE.md) — provider-neutral execution responsibilities.
 - [Repository workflow compatibility pointer](docs/quality/GIT_WORKFLOW.md) — redirects to shared policy.
 - [Tavall Docs Git Workflow](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/GIT_WORKFLOW.md) — shared contribution and review guidance.
+- [Function Catalog System Progression](docs/progression/FUNCTION_CATALOG_SYSTEM_PROGRESSION.md) — cross-module architecture, validation, and system history.
 
 ## Requirements / Compatibility
 
@@ -74,7 +75,7 @@ No license file is currently tracked. Contact the maintainers before redistribut
 
 | Surface | Sync State | Location | Last Updated | Evidence |
 | --- | --- | --- | --- | --- |
-| GitHub | `PRIMARY` | `TavallStudios/function-catalog/README.md` | 2026-09-27 12:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
+| GitHub | `PRIMARY` | `TavallStudios/function-catalog/README.md` | 2026-09-27 5:59 PM PDT | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) |
 | Notion | `NOT_APPLICABLE` | — | 2026-09-27 12:59 PM PDT | README routing surface; no 1:1 twin is assigned. |
 
 ### Update History
@@ -82,5 +83,6 @@ No license file is currently tracked. Contact the maintainers before redistribut
 | Timestamp | Surface | Event | Location | Previous Location | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-09-27 12:59 PM PDT | GitHub | `CREATED` | `TavallStudios/function-catalog/README.md` | — | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Added a public project front door and source-backed module map. |
+| 2026-09-27 5:59 PM PDT | GitHub | `UPDATED` | `TavallStudios/function-catalog/README.md` | `TavallStudios/function-catalog/README.md` | [PR #37](https://github.com/TavallStudios/function-catalog/pull/37) | Added the system Progression route. |
 
 </details>
