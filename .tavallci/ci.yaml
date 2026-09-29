@@ -16,7 +16,7 @@ artifacts:
   - name: function-catalog-mcp-server
     path: mcp-server/build/distributions/mcp-server-*.zip
   - name: tavall-cloud-contracts
-    path: tavall-cloud-contracts/build/libs/tavall-cloud-contracts-*.jar
+    path: build/tavall-artifacts/tavall-cloud-contracts.jar
 
 requiredChecks:
   - quality
@@ -53,6 +53,7 @@ checks:
       - ":mcp-server:assemble"
       - ":tavall-cloud-contracts:assemble"
       - ":mcp-server:distZip"
+      - "stageTavallCiArtifacts"
 
   integration:
     executor: gradle
