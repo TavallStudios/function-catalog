@@ -12,6 +12,10 @@ build:
 resources:
   mode: SYSTEM
 
+artifacts:
+  - name: function-catalog-mcp-server
+    path: mcp-server/build/distributions/mcp-server-*.zip
+
 requiredChecks:
   - quality
   - integration
@@ -44,8 +48,14 @@ checks:
       - ":openai-sdk:assemble"
       - ":claude-sdk:assemble"
       - ":mcp-server:assemble"
+      - ":mcp-server:distZip"
 
   integration:
     executor: gradle
     tasks:
       - ":mcp-server:integrationTest"
+
+  artifact:
+    executor: shell
+    script: .tavallci/scripts/publish-public-packages.sh
+    includeInAll: false
