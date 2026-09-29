@@ -271,17 +271,23 @@ class AIFunctionMcpServerTest {
     }
 
     private String codexExecutable() {
-        List<Path> candidates = List.of(
-                Path.of(System.getenv().getOrDefault("APPDATA", ""), "npm", "codex.cmd"),
-                Path.of(System.getProperty("user.home"), ".local", "bin", "codex.cmd"),
-                Path.of("C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.325.3894.0_x64__2p2nqsd0c76g0\\app\\resources\\codex.exe")
-        );
+        List<Path> candidates = isWindows()
+                ? List.of(
+                        Path.of(System.getenv().getOrDefault("APPDATA", ""), "npm", "codex.cmd"),
+                        Path.of(System.getProperty("user.home"), ".local", "bin", "codex.cmd"),
+                        Path.of("C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.325.3894.0_x64__2p2nqsd0c76g0\\app\\resources\\codex.exe")
+                )
+                : List.of(
+                        Path.of(System.getProperty("user.home"), ".local", "bin", "codex"),
+                        Path.of("/usr/local/bin/codex"),
+                        Path.of("/usr/bin/codex")
+                );
         for (Path candidate : candidates) {
-            if (Files.isRegularFile(candidate)) {
+            if (Files.isRegularFile(candidate) && (isWindows() || Files.isExecutable(candidate))) {
                 return candidate.toString();
             }
         }
-        return "codex.cmd";
+        return isWindows() ? "codex.cmd" : "codex";
     }
 
     private boolean isWindows() {
