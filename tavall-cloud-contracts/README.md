@@ -32,16 +32,9 @@ Function Catalog contract
 
 The Function Catalog must not learn node addresses, SSH details, GitHub installation secrets, sandbox credentials, or storage topology.
 
-## Local CI convention
+## CI convention
 
-This repository uses the same Tavall repository-owned CI entrypoint expected by multi-origin runners:
-
-```text
-bash scripts/ci/run ...
-        -> bash scripts/ci/verify <profile>
-```
-
-GitHub Actions workflows are intentionally not part of the execution architecture. Build, integration, and publish work runs on Tavall/local infrastructure and GitHub is used as source control, review, package hosting, and result reporting.
+The Cloud contracts module is built as part of the Function Catalog Gradle project. The repository-owned `.tavallci/ci.yaml` selects the default checks, and Tavall CI resolves the exact source and runs them on a Tavall Cloud Executor. GitHub Actions are not an execution path. Public package publication is an explicit optional Tavall CI profile; package hosting does not schedule builds.
 
 ## Current metadata note
 

@@ -15,6 +15,8 @@ resources:
 artifacts:
   - name: function-catalog-mcp-server
     path: mcp-server/build/distributions/mcp-server-*.zip
+  - name: tavall-cloud-contracts
+    path: tavall-cloud-contracts/build/libs/tavall-cloud-contracts-*.jar
 
 requiredChecks:
   - quality
@@ -31,6 +33,8 @@ checks:
       - ":openai-sdk:clean"
       - ":claude-sdk:clean"
       - ":mcp-server:clean"
+      - ":strands-agent-provider:clean"
+      - ":tavall-cloud-contracts:clean"
       - "check"
       - ":gemini-sdk:check"
       - ":ai-core:check"
@@ -39,6 +43,8 @@ checks:
       - ":openai-sdk:check"
       - ":claude-sdk:check"
       - ":mcp-server:check"
+      - ":strands-agent-provider:check"
+      - ":tavall-cloud-contracts:check"
       - "assemble"
       - ":gemini-sdk:assemble"
       - ":ai-core:assemble"
@@ -47,6 +53,8 @@ checks:
       - ":openai-sdk:assemble"
       - ":claude-sdk:assemble"
       - ":mcp-server:assemble"
+      - ":strands-agent-provider:assemble"
+      - ":tavall-cloud-contracts:assemble"
       - ":mcp-server:distZip"
 
   integration:
