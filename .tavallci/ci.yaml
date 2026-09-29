@@ -33,7 +33,6 @@ checks:
       - ":openai-sdk:clean"
       - ":claude-sdk:clean"
       - ":mcp-server:clean"
-      - ":strands-agent-provider:clean"
       - ":tavall-cloud-contracts:clean"
       - "check"
       - ":gemini-sdk:check"
@@ -43,7 +42,6 @@ checks:
       - ":openai-sdk:check"
       - ":claude-sdk:check"
       - ":mcp-server:check"
-      - ":strands-agent-provider:check"
       - ":tavall-cloud-contracts:check"
       - "assemble"
       - ":gemini-sdk:assemble"
@@ -53,7 +51,6 @@ checks:
       - ":openai-sdk:assemble"
       - ":claude-sdk:assemble"
       - ":mcp-server:assemble"
-      - ":strands-agent-provider:assemble"
       - ":tavall-cloud-contracts:assemble"
       - ":mcp-server:distZip"
 
