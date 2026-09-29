@@ -177,4 +177,12 @@ val stageRuntime = tasks.register<Sync>("stageRuntime") {
     }
 }
 
+val cloudContractsJar = project(":tavall-cloud-contracts").tasks.named<Jar>("jar")
+tasks.register<Copy>("stageTavallCiArtifacts") {
+    dependsOn(cloudContractsJar)
+    from(cloudContractsJar.flatMap { it.archiveFile })
+    into(layout.buildDirectory.dir("tavall-artifacts"))
+    rename { "tavall-cloud-contracts.jar" }
+}
+
 tasks.named("assemble") { dependsOn(stageRuntime) }
