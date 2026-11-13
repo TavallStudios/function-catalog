@@ -17,7 +17,7 @@ dependencies:
     identity: tavall-public-maven-mirror
     role: MAVEN_MIRROR
     selector: sha256
-    digest: ee130d9805f198ef9e91d88dda0dc1c13a6c2233b948646842c92a5cf3f16496
+    digest: c945956c42d0e49f28ec925d62956d94668c0b3fab0293d9dd2db028b26d9cd2
 
 artifacts:
   - name: function-catalog-mcp-server
