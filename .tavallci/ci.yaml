@@ -1,0 +1,42 @@
+version: 2
+
+source:
+  repository: TavallStudios/function-catalog
+  provider: github
+
+build:
+  type: gradle
+  java: 25
+  gradle: 9.6.1
+
+resources:
+  mode: SYSTEM
+
+artifacts:
+  - name: function-catalog-mcp-server
+    path: mcp-server/build/distributions/mcp-server-*.zip
+
+requiredChecks:
+  - compilation
+  - unit-tests
+  - quality
+  - artifact
+
+checks:
+  compilation:
+    executor: gradle
+    tasks:
+      - classes
+  unit-tests:
+    executor: gradle
+    tasks:
+      - test
+  quality:
+    executor: gradle
+    tasks:
+      - check
+  artifact:
+    executor: gradle
+    tasks:
+      - assemble
+      - :mcp-server:distZip
