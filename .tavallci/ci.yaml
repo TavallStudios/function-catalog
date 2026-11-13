@@ -12,6 +12,13 @@ build:
 resources:
   mode: SYSTEM
 
+dependencies:
+  - kind: artifact
+    identity: tavall-public-maven-mirror
+    role: MAVEN_MIRROR
+    selector: sha256
+    digest: ee130d9805f198ef9e91d88dda0dc1c13a6c2233b948646842c92a5cf3f16496
+
 artifacts:
   - name: function-catalog-mcp-server
     path: mcp-server/build/distributions/mcp-server-*.zip
