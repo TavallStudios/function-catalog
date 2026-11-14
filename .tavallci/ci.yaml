@@ -1,0 +1,49 @@
+version: 2
+
+source:
+  repository: TavallStudios/function-catalog
+  provider: github
+
+build:
+  type: gradle
+  java: 25
+  gradle: 9.6.1
+
+resources:
+  mode: SYSTEM
+
+dependencies:
+  - kind: artifact
+    identity: tavall-public-maven-mirror
+    role: MAVEN_MIRROR
+    selector: sha256
+    digest: a85e18639cf0e5e5fc2067fb5a155ccf9e23f655cc8fd60f7e78d347467ce86a
+
+artifacts:
+  - name: function-catalog-mcp-server
+    path: mcp-server/build/distributions/mcp-server-*.zip
+
+requiredChecks:
+  - compilation
+  - unit-tests
+  - quality
+  - artifact
+
+checks:
+  compilation:
+    executor: gradle
+    tasks:
+      - classes
+  unit-tests:
+    executor: gradle
+    tasks:
+      - test
+  quality:
+    executor: gradle
+    tasks:
+      - check
+  artifact:
+    executor: gradle
+    tasks:
+      - assemble
+      - :mcp-server:distZip

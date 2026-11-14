@@ -1,16 +1,12 @@
 package org.tavall.ai.mcp.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.modelcontextprotocol.server.McpServer;
-import io.modelcontextprotocol.server.McpSyncServer;
-import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
 import org.tavall.ai.core.catalog.AIFunctionRegistrar;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 
 public final class AIFunctionMcpServerLauncher {
     public static void main(String[] args) {
@@ -45,26 +41,23 @@ public final class AIFunctionMcpServerLauncher {
             throw new IllegalStateException("No @AIFunction methods were registered.");
         }
 
-        JacksonMcpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
-        StdioServerTransportProvider transportProvider = new StdioServerTransportProvider(jsonMapper);
-        McpSyncServer server = McpServer.sync(transportProvider)
-                .serverInfo("FunctionCatalog MCP", "1.0.0")
-                .instructions("Call the cataloged @AIFunction methods. Disabled functions return structured errors.")
-                .jsonMapper(jsonMapper)
-                .tools(new AIFunctionMcpToolPublisher(objectMapper).toolSpecifications(catalog))
-                .build();
-
-        CountDownLatch latch = new CountDownLatch(1);
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                server.close();
-            } catch (Exception ignored) {
-                // ignore shutdown close failures
-            }
-            transportProvider.close();
-            latch.countDown();
-        }, "function-catalog-mcp-shutdown"));
-        latch.await();
+        AIFunctionMcpStandaloneStdioServer.Configuration serverConfiguration =
+                new AIFunctionMcpStandaloneStdioServer.Configuration(
+                        "FunctionCatalog MCP",
+                        "1.0.0",
+                        "Call the cataloged @AIFunction methods. Disabled functions return structured errors."
+                );
+        try (AIFunctionMcpStandaloneStdioServer server =
+                     AIFunctionMcpStandaloneStdioServer.start(catalog, serverConfiguration)) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    server.close();
+                } catch (RuntimeException ignored) {
+                    // Preserve normal JVM shutdown.
+                }
+            }, "function-catalog-mcp-shutdown"));
+            server.awaitTermination();
+        }
     }
 
     private static AIFunctionRegistrar instantiateRegistrar(String registrarClassName) {

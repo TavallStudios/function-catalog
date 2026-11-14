@@ -1,9 +1,12 @@
 package org.tavall.ai.core.schema;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,5 +44,23 @@ class AIFunctionSchemaGeneratorTest {
         assertEquals("array", schema.path("properties").path("ids").path("type").asText());
         assertEquals("integer", schema.path("properties").path("ids").path("items").path("type").asText());
         assertTrue(schema.path("properties").path("payloadByKey").path("additionalProperties").has("properties"));
+    }
+
+    @Test
+    void generatesEnumSchemaFromJacksonWireValues() {
+        ObjectNode schema = schemaGenerator.generateTypeSchema(WireStatus.class);
+
+        assertEquals("string", schema.path("type").asText());
+        assertEquals(
+                List.of("needs-review", "ready"),
+                objectMapper.convertValue(schema.path("enum"), objectMapper.getTypeFactory().constructCollectionType(List.class, String.class))
+        );
+    }
+
+    private enum WireStatus {
+        @JsonProperty("ready")
+        READY,
+        @JsonProperty("needs-review")
+        NEEDS_REVIEW
     }
 }

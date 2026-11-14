@@ -17,9 +17,11 @@ val junit = libs.junit
 val junitLauncher = libs.junit.launcher
 val mcpCore = libs.mcp.core
 val mcpJackson = libs.mcp.jackson
+val mcpJackson2 = libs.mcp.jackson2
 val mockitoCore = libs.mockito.core
 val mockitoJunit = libs.mockito.junit
 val slf4j = libs.slf4j
+val tomcatEmbedCore = libs.tomcat.embed.core
 
 subprojects {
     group = rootProject.group
@@ -114,6 +116,20 @@ project(":codex-agent-provider") {
     }
 }
 
+project(":strands-agent-provider") {
+    dependencies {
+        "api"(project(":agent-runtime"))
+        "api"(jackson)
+        "api"(slf4j)
+        "implementation"(project(":mcp-server"))
+        "implementation"(mcpCore)
+        "implementation"(mcpJackson2)
+        "testImplementation"(junit)
+        "testImplementation"(assertj)
+        "testRuntimeOnly"(junitLauncher)
+    }
+}
+
 for (module in listOf(":openai-sdk", ":claude-sdk")) {
     project(module) {
         dependencies {
@@ -148,6 +164,7 @@ project(":mcp-server") {
         "api"(slf4j)
         "api"(mcpCore)
         "api"(mcpJackson)
+        "implementation"(tomcatEmbedCore)
         "testImplementation"(junit)
         "testImplementation"(assertj)
         "testRuntimeOnly"(junitLauncher)

@@ -1,10 +1,12 @@
 name: Gradle
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
       - main
+      - "working/**"
 
 permissions:
   contents: read
@@ -19,4 +21,5 @@ jobs:
           distribution: temurin
           java-version: "25"
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew --no-daemon clean check publishToMavenLocal stageRuntime
+      - name: Validate Function Catalog
+        run: ./gradlew --no-daemon clean check publishToMavenLocal stageRuntime
