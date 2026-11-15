@@ -45,6 +45,8 @@ checks:
       - check
   artifact:
     executor: gradle
+    gradleProperties:
+      tavallVersion: 0.0.1-SNAPSHOT
     tasks:
       - assemble
       - :mcp-server:distZip
