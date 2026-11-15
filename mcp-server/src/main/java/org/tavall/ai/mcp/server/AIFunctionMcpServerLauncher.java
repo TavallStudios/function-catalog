@@ -46,11 +46,37 @@ public final class AIFunctionMcpServerLauncher {
             throw new IllegalStateException("No @AIFunction methods or Tavall skill resources were configured.");
         }
 
+        if (safeConfiguration.skillResourceRoot() == null) {
+            AIFunctionMcpStandaloneStdioServer.Configuration serverConfiguration =
+                    new AIFunctionMcpStandaloneStdioServer.Configuration(
+                            "FunctionCatalog MCP",
+                            "1.0.0",
+                            "Call the cataloged @AIFunction methods. Disabled functions return structured errors."
+                    );
+            try (AIFunctionMcpStandaloneStdioServer server =
+                         AIFunctionMcpStandaloneStdioServer.start(catalog, serverConfiguration)) {
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    try {
+                        server.close();
+                    } catch (RuntimeException ignored) {
+                        // Preserve normal JVM shutdown.
+                    }
+                }, "function-catalog-mcp-shutdown"));
+                server.awaitTermination();
+            }
+            return;
+        }
+
+        TavallSkillResourcePublisher skillPublisher = new TavallSkillResourcePublisher(
+                objectMapper,
+                safeConfiguration.skillResourceRoot()
+        );
+        String instructions = "Call cataloged @AIFunction methods for actions. Tavall skill instructions are read-only MCP resources under skills://tavall/. Disabled functions return structured errors.";
         JacksonMcpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
         StdioServerTransportProvider transportProvider = new StdioServerTransportProvider(jsonMapper);
         var serverBuilder = McpServer.sync(transportProvider)
                 .serverInfo("FunctionCatalog MCP", "1.0.0")
-                .instructions("Call cataloged @AIFunction methods for actions. Tavall skill instructions are read-only MCP resources under skills://tavall/. Disabled functions return structured errors.")
+                .instructions(instructions)
                 .jsonMapper(jsonMapper);
 
         var toolSpecifications = new AIFunctionMcpToolPublisher(objectMapper).toolSpecifications(catalog);
@@ -58,23 +84,16 @@ public final class AIFunctionMcpServerLauncher {
             serverBuilder.tools(toolSpecifications);
         }
 
-        if (safeConfiguration.skillResourceRoot() != null) {
-            TavallSkillResourcePublisher skillPublisher = new TavallSkillResourcePublisher(
-                    objectMapper,
-                    safeConfiguration.skillResourceRoot()
-            );
-            McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder()
-                    .resources(false, false);
-            if (!toolSpecifications.isEmpty()) {
-                capabilities.tools(false);
-            }
-            serverBuilder.capabilities(capabilities.build())
-                    .resources(skillPublisher.manifestResourceSpecification())
-                    .resourceTemplates(skillPublisher.skillResourceTemplateSpecification());
+        McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder()
+                .resources(false, false);
+        if (!toolSpecifications.isEmpty()) {
+            capabilities.tools(false);
         }
+        serverBuilder.capabilities(capabilities.build())
+                .resources(skillPublisher.manifestResourceSpecification())
+                .resourceTemplates(skillPublisher.skillResourceTemplateSpecification());
 
         McpSyncServer server = serverBuilder.build();
-
         CountDownLatch latch = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
@@ -82,7 +101,10 @@ public final class AIFunctionMcpServerLauncher {
             } catch (Exception ignored) {
                 // ignore shutdown close failures
             }
-            transportProvider.close();
+            try {
+                transportProvider.close();
+            } catch (Exception ignored) {
+            }
             latch.countDown();
         }, "function-catalog-mcp-shutdown"));
         latch.await();

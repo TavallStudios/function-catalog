@@ -174,28 +174,32 @@ public final class AIFunctionCatalog {
         return exportCanonicalFunctionSchemas();
     }
 
-    public synchronized AIFunctionInvocationResult invokeResult(String functionName, JsonNode argumentsJson) {
+    public AIFunctionInvocationResult invokeResult(String functionName, JsonNode argumentsJson) {
         return invokeResult(null, functionName, argumentsJson);
     }
 
-    public synchronized AIFunctionInvocationResult invokeResult(String callId, String functionName, JsonNode argumentsJson) {
+    public AIFunctionInvocationResult invokeResult(String callId, String functionName, JsonNode argumentsJson) {
         String safeFunctionName = requireText(functionName, "functionName");
         JsonNode safeArguments = normalizeArguments(argumentsJson);
-        refreshStateFromDiskIfChanged();
-
-        RegisteredFunction function = functions.get(safeFunctionName);
-        if (function == null) {
-            return buildFailure(callId, safeFunctionName, safeArguments, "not_found", "No function registered with name: " + safeFunctionName);
+        RegisteredFunction function;
+        AIFunctionDefinition definition;
+        int argumentSize;
+        synchronized (this) {
+            refreshStateFromDiskIfChanged();
+            function = functions.get(safeFunctionName);
+            if (function == null) {
+                return buildFailure(callId, safeFunctionName, safeArguments, "not_found", "No function registered with name: " + safeFunctionName);
+            }
+            if (!function.enabled) {
+                return buildFailure(callId, safeFunctionName, safeArguments, "disabled", "Function '" + safeFunctionName + "' is disabled.");
+            }
+            definition = function.toDefinition();
+            argumentSize = estimateArgumentSize(safeArguments);
         }
 
-        if (!function.enabled) {
-            return buildFailure(callId, safeFunctionName, safeArguments, "disabled", "Function '" + safeFunctionName + "' is disabled.");
-        }
-
-        int argumentSize = estimateArgumentSize(safeArguments);
         auditLogger.onInvocationStart(safeFunctionName, argumentSize);
         try {
-            functionPolicy.checkInvocation(new AIFunctionInvocationContext(safeFunctionName, safeArguments, function.toDefinition()));
+            functionPolicy.checkInvocation(new AIFunctionInvocationContext(safeFunctionName, safeArguments, definition));
             Object[] invocationArguments = mapArguments(function, safeArguments);
             Object result = function.method.invoke(function.target, invocationArguments);
             auditLogger.onInvocationSuccess(safeFunctionName, argumentSize);
