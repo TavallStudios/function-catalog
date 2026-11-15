@@ -1,0 +1,112 @@
+name: Publish repository-staging snapshot
+
+on:
+  issues:
+    types:
+      - labeled
+
+permissions:
+  contents: read
+  issues: write
+  packages: write
+
+concurrency:
+  group: function-catalog-repository-staging-snapshot
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event.issue.state == 'open' &&
+      github.event.issue.user.login == 'tjXJNOOBIE' &&
+      github.event.label.name == 'repository-staging-snapshot-approved'
+    runs-on:
+      - self-hosted
+      - linux
+      - tavall-cloud-control
+    timeout-minutes: 20
+    steps:
+      - name: Validate exact snapshot request
+        id: request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.issue.body ?? '').trim();
+            const match = /^revision:\s*([a-f0-9]{40})\nversion:\s*([0-9A-Za-z_.-]+-SNAPSHOT)$/.exec(body);
+            if (!match) {
+              core.setFailed('Issue body must be exactly two lines: revision: <40-char SHA> and version: <bounded -SNAPSHOT version>');
+              return;
+            }
+            if (match[2].length > 160 || !match[2].startsWith('0.0.0-working_repository-staging-')) {
+              core.setFailed('Only bounded working repository-staging snapshot versions are allowed');
+              return;
+            }
+            core.setOutput('revision', match[1]);
+            core.setOutput('version', match[2]);
+
+      - name: Checkout exact Function Catalog revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.request.outputs.revision }}
+          fetch-depth: 1
+
+      - name: Verify exact source and Java 25
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.request.outputs.revision }}"
+          java -version 2>&1 | grep -E 'version "25([.]|\")'
+          test -x ./gradlew
+
+      - name: Validate repository-staging exact source
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=1 \
+            -PtavallVersion="${{ steps.request.outputs.version }}" \
+            :repository-staging:test
+
+      - name: Publish bounded snapshot modules
+        id: publish
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=1 \
+            -PtavallVersion="${{ steps.request.outputs.version }}" \
+            :ai-core:publish :repository-staging:publish
+          printf 'revision=%s\n' '${{ steps.request.outputs.revision }}' >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' '${{ steps.request.outputs.version }}' >> "${GITHUB_OUTPUT}"
+
+      - name: Publish result
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          PUBLISH_REVISION: ${{ steps.request.outputs.revision }}
+          PUBLISH_VERSION: ${{ steps.request.outputs.version }}
+        with:
+          script: |
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const ok = process.env.PUBLISH_OUTCOME === 'success';
+            const body = [
+              '### Repository-staging snapshot publication',
+              '',
+              `- **Outcome:** \`${ok ? 'SUCCESS' : 'FAILED'}\``,
+              `- **Revision:** \`${process.env.PUBLISH_REVISION}\``,
+              `- **Version:** \`${process.env.PUBLISH_VERSION}\``,
+              '- **Modules:** `ai-core`, `repository-staging`',
+              `- **Workflow run:** [${process.env.GITHUB_RUN_ID}](${runUrl})`,
+              '- **Runner:** `tavall-cloud-control`'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

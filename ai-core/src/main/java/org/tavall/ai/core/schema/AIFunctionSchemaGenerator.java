@@ -1,6 +1,7 @@
 package org.tavall.ai.core.schema;
 
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -68,7 +69,9 @@ public final class AIFunctionSchemaGenerator {
         Class<?> rawClass = safeType.getRawClass();
 
         if (Optional.class.isAssignableFrom(rawClass)) {
-            JavaType contentType = safeType.containedTypeCount() > 0 ? safeType.containedType(0) : objectMapper.getTypeFactory().constructType(Object.class);
+            JavaType contentType = safeType.containedTypeCount() > 0
+                    ? safeType.containedType(0)
+                    : objectMapper.getTypeFactory().constructType(Object.class);
             return createTypeSchema(contentType, activeTypes);
         }
 
@@ -195,7 +198,9 @@ public final class AIFunctionSchemaGenerator {
             ArrayNode required = schema.putArray("required");
 
             for (PropertyDescriptor descriptor : descriptors) {
-                JavaType propertyType = objectMapper.getTypeFactory().constructType(descriptor.getReadMethod().getGenericReturnType());
+                JavaType propertyType = objectMapper.getTypeFactory().constructType(
+                        descriptor.getReadMethod().getGenericReturnType()
+                );
                 properties.set(descriptor.getName(), createTypeSchema(propertyType, activeTypes));
                 if (descriptor.getReadMethod().getReturnType().isPrimitive()) {
                     required.add(descriptor.getName());
@@ -213,14 +218,20 @@ public final class AIFunctionSchemaGenerator {
         ObjectNode schema = objectMapper.createObjectNode();
         schema.put("type", "string");
         ArrayNode enumValues = schema.putArray("enum");
-        List<String> names = new ArrayList<>();
+        List<String> values = new ArrayList<>();
         for (Object constant : enumClass.getEnumConstants()) {
-            names.add(((Enum<?>) constant).name());
+            JsonNode serialized = objectMapper.valueToTree(constant);
+            if (!serialized.isTextual()) {
+                throw new IllegalArgumentException(
+                        "Enum values exposed through Function Catalog must serialize as strings: " + enumClass.getName()
+                );
+            }
+            values.add(serialized.asText());
         }
 
-        names.sort(String::compareTo);
-        for (String name : names) {
-            enumValues.add(name);
+        values.sort(String::compareTo);
+        for (String value : values) {
+            enumValues.add(value);
         }
         return schema;
     }
@@ -262,23 +273,24 @@ public final class AIFunctionSchemaGenerator {
     }
 
     private boolean isStringType(Class<?> rawClass) {
-        return char.class.equals(rawClass)
+        return String.class.equals(rawClass)
                 || Character.class.equals(rawClass)
-                || String.class.equals(rawClass)
+                || char.class.equals(rawClass)
                 || CharSequence.class.isAssignableFrom(rawClass);
     }
 
-    private boolean isStringMapKey(Class<?> keyClass) {
-        return String.class.equals(keyClass)
-                || CharSequence.class.isAssignableFrom(keyClass)
-                || Object.class.equals(keyClass);
+    private boolean isStringMapKey(Class<?> rawClass) {
+        return String.class.equals(rawClass)
+                || Character.class.equals(rawClass)
+                || char.class.equals(rawClass)
+                || CharSequence.class.isAssignableFrom(rawClass)
+                || rawClass.isEnum();
     }
 
-    private static <T> T requireValue(T value, String fieldName) {
-        if (value != null) {
-            return value;
+    private static <T> T requireValue(T value, String name) {
+        if (value == null) {
+            throw new IllegalArgumentException(name + " must not be null");
         }
-
-        throw new IllegalArgumentException(fieldName + " must not be null");
+        return value;
     }
 }
