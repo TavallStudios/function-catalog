@@ -21,7 +21,7 @@ dependencies:
 
 artifacts:
   - name: function-catalog-mcp-server
-    path: mcp-server/build/distributions/mcp-server-*.zip
+    path: mcp-server/build/distributions/function-catalog-mcp-server-*.zip
 
 requiredChecks:
   - compilation

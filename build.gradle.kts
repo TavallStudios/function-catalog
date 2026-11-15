@@ -155,6 +155,9 @@ project(":gemini-sdk") {
 
 project(":mcp-server") {
     apply(plugin = "application")
+    tasks.named<Zip>("distZip") {
+        archiveBaseName.set("function-catalog-mcp-server")
+    }
     extensions.configure<JavaApplication> {
         mainClass = "org.tavall.ai.mcp.server.AIFunctionMcpServerLauncher"
     }
