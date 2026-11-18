@@ -22,14 +22,14 @@ function-catalog/
 ├── **[`strands-agent-provider`](README.md) ← This Module**
 ├── [`openai-sdk`](../openai-sdk/README.md)
 ├── [`claude-sdk`](../claude-sdk/README.md)
-└── [`mcp-server`](../mcp-server/README.md)
+└── [`tavall-function-catalog-mcp-runtime`](../tavall-function-catalog-mcp-runtime/README.md)
 
 ## Relationships
 
 | Module / System | Relationship |
 | --- | --- |
 | [`agent-runtime`](../agent-runtime/README.md) | Implements the provider interface consumed by the runtime. |
-| [`mcp-server`](../mcp-server/README.md) | Shares MCP protocol concerns without owning the catalog server. |
+| [`tavall-function-catalog-mcp-runtime`](../tavall-function-catalog-mcp-runtime/README.md) | Shares MCP protocol concerns without owning the catalog server. |
 
 ## Documentation
 

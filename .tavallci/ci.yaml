@@ -20,8 +20,8 @@ dependencies:
     digest: 29ae839cfb9ab3942bfe640a0450d1da57ba2d09cbc261fccbf5e62778b7d63d
 
 artifacts:
-  - name: function-catalog-mcp-server
-    path: mcp-server/build/distributions/function-catalog-mcp-server-*.zip
+  - name: tavall-function-catalog-mcp-runtime
+    path: tavall-function-catalog-mcp-runtime/build/distributions/tavall-function-catalog-mcp-runtime-*.zip
     channel: SNAPSHOT
 
 requiredChecks:
@@ -49,4 +49,4 @@ checks:
       tavallVersion: 0.0.1-SNAPSHOT
     tasks:
       - assemble
-      - :mcp-server:distZip
+      - :tavall-function-catalog-mcp-runtime:distZip

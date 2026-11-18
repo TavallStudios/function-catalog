@@ -66,7 +66,7 @@ This record measures the module’s implementation maturity, API/integration sta
 | Dependency / Consumer | Relationship | State | Evidence |
 | --- | --- | --- | --- |
 | Root build and module source | Independent Gradle subproject | 7 tracked production Java source files; no files under `src/test`; no `src/integrationTest` files | [`settings.gradle.kts`](https://github.com/TavallStudios/function-catalog/blob/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530/settings.gradle.kts), [module tree](https://github.com/TavallStudios/function-catalog/tree/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530/strands-agent-provider) |
-| Module dependencies | API dependency on `agent-runtime`; implementation dependency on `mcp-server` and MCP client/Jackson libraries. | Declared in the root Gradle build; dependency resolution was not run | [`build.gradle.kts`](https://github.com/TavallStudios/function-catalog/blob/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530/build.gradle.kts) |
+| Module dependencies | API dependency on `agent-runtime`; implementation dependency on `tavall-function-catalog-mcp-runtime` and MCP client/Jackson libraries. | Declared in the root Gradle build; dependency resolution was not run | [`build.gradle.kts`](https://github.com/TavallStudios/function-catalog/blob/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530/build.gradle.kts) |
 | Runtime / primary consumer | agent-runtime | No consumer acceptance verified | [Module README](../../strands-agent-provider/README.md) |
 
 ## Blockers

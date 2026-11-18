@@ -22,7 +22,7 @@ function-catalog/
 ├── [`strands-agent-provider`](../strands-agent-provider/README.md)
 ├── [`openai-sdk`](../openai-sdk/README.md)
 ├── [`claude-sdk`](../claude-sdk/README.md)
-└── [`mcp-server`](../mcp-server/README.md)
+└── [`tavall-function-catalog-mcp-runtime`](../tavall-function-catalog-mcp-runtime/README.md)
 
 ## Relationships
 

@@ -23,14 +23,14 @@ function-catalog/
 ├── [`strands-agent-provider`](../strands-agent-provider/README.md)
 ├── [`openai-sdk`](../openai-sdk/README.md)
 ├── [`claude-sdk`](../claude-sdk/README.md)
-└── [`mcp-server`](../mcp-server/README.md)
+└── [`tavall-function-catalog-mcp-runtime`](../tavall-function-catalog-mcp-runtime/README.md)
 
 ## Relationships
 
 | Module / System | Relationship |
 | --- | --- |
 | [`agent-runtime`](../agent-runtime/README.md) | Uses the catalog to resolve and narrow per-job function views. |
-| [`mcp-server`](../mcp-server/README.md) | Publishes registered catalog functions through MCP. |
+| [`tavall-function-catalog-mcp-runtime`](../tavall-function-catalog-mcp-runtime/README.md) | Publishes registered catalog functions through MCP. |
 | [`gemini-sdk`](../gemini-sdk/README.md) | Separate provider client integration. |
 
 ## Documentation
@@ -45,12 +45,12 @@ function-catalog/
 
 > This module is not independently deployed.
 
-Runtime owner: [`mcp-server`](../mcp-server/README.md). Deployment record: [TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md](../TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md).
+Runtime owner: [`tavall-function-catalog-mcp-runtime`](../tavall-function-catalog-mcp-runtime/README.md). Deployment record: [TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md](../TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md).
 
 ## Development
 
 - **Module Type:** `LIBRARY`
-- **Runtime:** `mcp-server`
+- **Runtime:** `tavall-function-catalog-mcp-runtime`
 - **Current PR Stack:** [mainline integration #10](https://github.com/TavallStudios/function-catalog/pull/10), [WorldOps contract #19](https://github.com/TavallStudios/function-catalog/pull/19), [product intelligence #21](https://github.com/TavallStudios/function-catalog/pull/21); documentation update: [PR #37](https://github.com/TavallStudios/function-catalog/pull/37).
 - Shared contribution policy: [Tavall Docs Git Workflow](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/GIT_WORKFLOW.md).
 
