@@ -121,7 +121,7 @@ project(":strands-agent-provider") {
         "api"(project(":agent-runtime"))
         "api"(jackson)
         "api"(slf4j)
-        "implementation"(project(":mcp-server"))
+        "implementation"(project(":tavall-function-catalog-mcp-runtime"))
         "implementation"(mcpCore)
         "implementation"(mcpJackson2)
         "testImplementation"(junit)
@@ -153,8 +153,11 @@ project(":gemini-sdk") {
     }
 }
 
-project(":mcp-server") {
+project(":tavall-function-catalog-mcp-runtime") {
     apply(plugin = "application")
+    tasks.named<Zip>("distZip") {
+        archiveBaseName.set("tavall-function-catalog-mcp-runtime")
+    }
     extensions.configure<JavaApplication> {
         mainClass = "org.tavall.ai.mcp.server.AIFunctionMcpServerLauncher"
     }
@@ -184,13 +187,13 @@ project(":mcp-server") {
 }
 
 val stageRuntime = tasks.register<Sync>("stageRuntime") {
-    dependsOn(":mcp-server:jar")
+    dependsOn(":tavall-function-catalog-mcp-runtime:jar")
     into(layout.projectDirectory.dir("distribution"))
-    from(project(":mcp-server").tasks.named<Jar>("jar").flatMap { it.archiveFile }) {
+    from(project(":tavall-function-catalog-mcp-runtime").tasks.named<Jar>("jar").flatMap { it.archiveFile }) {
         rename { "application.jar" }
     }
     into("libs") {
-        from(project(":mcp-server").configurations.named("runtimeClasspath"))
+        from(project(":tavall-function-catalog-mcp-runtime").configurations.named("runtimeClasspath"))
     }
 }
 

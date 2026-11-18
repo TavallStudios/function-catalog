@@ -25,7 +25,7 @@ This repository does not document published dependency coordinates. Use JDK 25 a
 
 ## How It Works
 
-`ai-core` owns the typed function catalog. `agent-runtime` and provider modules add separate agent-execution capabilities. `mcp-server` exposes catalog functions through MCP. Applications select the modules they need.
+`ai-core` owns the typed function catalog. `agent-runtime` and provider modules add separate agent-execution capabilities. `tavall-function-catalog-mcp-runtime` exposes catalog functions through MCP. Applications select the modules they need.
 
 ## Project Structure
 
@@ -36,7 +36,7 @@ This repository does not document published dependency coordinates. Use JDK 25 a
 ├── [`strands-agent-provider`](strands-agent-provider/README.md)
 ├── [`openai-sdk`](openai-sdk/README.md)
 ├── [`claude-sdk`](claude-sdk/README.md)
-└── [`mcp-server`](mcp-server/README.md)
+└── [`tavall-function-catalog-mcp-runtime`](tavall-function-catalog-mcp-runtime/README.md)
 
 ## Documentation
 
@@ -54,7 +54,7 @@ This repository does not document published dependency coordinates. Use JDK 25 a
 
 ## Building From Source
 
-Run `./gradlew check`. The `mcp-server` module assembles the executable MCP application.
+Run `./gradlew check`. The `tavall-function-catalog-mcp-runtime` module assembles the executable MCP application.
 
 ## Contributing
 
@@ -62,7 +62,7 @@ Open a pull request and follow the canonical Tavall contribution and review poli
 
 ## Deployment
 
-The `mcp-server` module is independently executable. Current target and deployed source are not recorded in GitHub deployment evidence; see [the deployment record](TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md).
+The `tavall-function-catalog-mcp-runtime` module is independently executable. Current target and deployed source are not recorded in GitHub deployment evidence; see [the deployment record](TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md).
 
 ## License
 

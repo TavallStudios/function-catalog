@@ -6,7 +6,7 @@
 
 ## About
 
-The independently executable `mcp-server` module launches the Function Catalog MCP application over HTTP or stdio. This record includes only deployment evidence available in this repository's GitHub history; a runnable application does not establish that a deployment exists.
+The independently executable `tavall-function-catalog-mcp-runtime` module launches the Function Catalog MCP application over HTTP or stdio. This record includes only deployment evidence available in this repository's GitHub history; a runnable application does not establish that a deployment exists.
 
 ## Deployment Targets
 
@@ -28,7 +28,7 @@ This repository documents an executable server boundary but not a deployed endpo
 
 - [Function Catalog architecture](docs/AGENT_FUNCTION_CATALOG_ARCHITECTURE.md)
 - [Agent runtime architecture](docs/TAVALL_AGENT_RUNTIME_ARCHITECTURE.md)
-- [MCP server module](mcp-server/README.md)
+- [Tavall Function Catalog MCP Runtime module](tavall-function-catalog-mcp-runtime/README.md)
 - [Tavall Docs Git Workflow](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/GIT_WORKFLOW.md)
 
 

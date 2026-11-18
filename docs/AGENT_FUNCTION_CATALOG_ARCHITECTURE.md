@@ -21,6 +21,18 @@ The same view owns discovery and invocation. Hiding a function from model/tool d
 
 MCP publication uses the same view instead of maintaining a second tool registry or a publication-only filter. External MCP clients and first-party Tavall agents therefore share one capability boundary.
 
+### Account caller and MCP catalog tiers (proposed)
+
+For Account-scoped MCP hosting, the catalog view also receives a typed, issuer-verified Account caller when one exists. Tavall Web's [Account-scoped MCP design](https://github.com/TavallStudios/tavall-web/blob/staging/runtime-web/docs/architecture/TAVALL_WEB_HOST_AND_MCP_ROUTING.md#account-scoped-mcp-hosting-design-proposal) defines the three access tiers; this document owns how the Function Catalog limits discovery and invocation to the resulting caller and job scope.
+
+- **Public/free first-party entries:** anonymous discovery and invocation are allowed only for explicitly public/free functions. The view applies route/service budgets, while the owning endpoint enforces rate, cost, and operation constraints. No synthetic Account caller is created for anonymous requests.
+- **User-submitted entries:** only an approved, currently published revision can enter the public view. Review state, publisher identity, and declared capabilities are catalog metadata, not grants. Each invocation uses the consuming caller's Account identity/credential where required; publisher credentials are never inherited. User submissions cannot gain access to Tavall internal services, private address ranges, metadata endpoints, another Account's data, or undisclosed functions.
+- **Private account-owned connections:** these are resolved outside the public catalog view from the verified caller's Account UUID and an opaque connection ID. The view cannot list them globally. Both discovery/list and invocation recheck `mcp.private.use` and owner equality; create/update/delete also require `mcp.private.manage_own`. Missing and foreign-owned records use the same not-found outcome.
+
+The proposed shared verifier contract supplies an immutable caller value containing issuer, audience/resource, stable Account UUID, expiry, and verified permissions/scopes. A client-provided Account ID, agent description, MCP session, or hidden function name never populates that value. Catalog filtering and direct invocation both consume the same caller context, but owning services still recheck their own permission. Catalog visibility is not authorization.
+
+Anonymous public use is governed by transparent per-IP/per-route token buckets plus global concurrency and cost ceilings. Signed-in callers may receive an additional Account-keyed budget. These abuse controls are independent of private Account permission checks and must not turn the free catalog into an account-only feature.
+
 ## Tavall Cloud boundary
 
 Tavall Cloud remains the distributed execution authority.

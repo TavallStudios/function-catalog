@@ -1,12 +1,17 @@
 package org.tavall.ai.mcp.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.modelcontextprotocol.server.McpServer;
+import io.modelcontextprotocol.server.McpSyncServer;
+import io.modelcontextprotocol.server.transport.StdioServerTransportProvider;
+import io.modelcontextprotocol.spec.McpSchema;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
 import org.tavall.ai.core.catalog.AIFunctionRegistrar;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 public final class AIFunctionMcpServerLauncher {
     public static void main(String[] args) {
@@ -37,27 +42,72 @@ public final class AIFunctionMcpServerLauncher {
         if (!safeConfiguration.scanPackages().isEmpty()) {
             catalog.scanPackages(safeConfiguration.scanPackages());
         }
-        if (catalog.getFunctionDefinitions().isEmpty()) {
-            throw new IllegalStateException("No @AIFunction methods were registered.");
+        if (catalog.getFunctionDefinitions().isEmpty() && safeConfiguration.skillResourceRoot() == null) {
+            throw new IllegalStateException("No @AIFunction methods or Tavall skill resources were configured.");
         }
 
-        AIFunctionMcpStandaloneStdioServer.Configuration serverConfiguration =
-                new AIFunctionMcpStandaloneStdioServer.Configuration(
-                        "FunctionCatalog MCP",
-                        "1.0.0",
-                        "Call the cataloged @AIFunction methods. Disabled functions return structured errors."
-                );
-        try (AIFunctionMcpStandaloneStdioServer server =
-                     AIFunctionMcpStandaloneStdioServer.start(catalog, serverConfiguration)) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                try {
-                    server.close();
-                } catch (RuntimeException ignored) {
-                    // Preserve normal JVM shutdown.
-                }
-            }, "function-catalog-mcp-shutdown"));
-            server.awaitTermination();
+        if (safeConfiguration.skillResourceRoot() == null) {
+            AIFunctionMcpStandaloneStdioServer.Configuration serverConfiguration =
+                    new AIFunctionMcpStandaloneStdioServer.Configuration(
+                            "FunctionCatalog MCP",
+                            "1.0.0",
+                            "Call the cataloged @AIFunction methods. Disabled functions return structured errors."
+                    );
+            try (AIFunctionMcpStandaloneStdioServer server =
+                         AIFunctionMcpStandaloneStdioServer.start(catalog, serverConfiguration)) {
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    try {
+                        server.close();
+                    } catch (RuntimeException ignored) {
+                        // Preserve normal JVM shutdown.
+                    }
+                }, "function-catalog-mcp-shutdown"));
+                server.awaitTermination();
+            }
+            return;
         }
+
+        TavallSkillResourcePublisher skillPublisher = new TavallSkillResourcePublisher(
+                objectMapper,
+                safeConfiguration.skillResourceRoot()
+        );
+        String instructions = "Call cataloged @AIFunction methods for actions. Tavall skill instructions are read-only MCP resources under skills://tavall/. Disabled functions return structured errors.";
+        JacksonMcpJsonMapper jsonMapper = new JacksonMcpJsonMapper(objectMapper);
+        StdioServerTransportProvider transportProvider = new StdioServerTransportProvider(jsonMapper);
+        var serverBuilder = McpServer.sync(transportProvider)
+                .serverInfo("FunctionCatalog MCP", "1.0.0")
+                .instructions(instructions)
+                .jsonMapper(jsonMapper);
+
+        var toolSpecifications = new AIFunctionMcpToolPublisher(objectMapper).toolSpecifications(catalog);
+        if (!toolSpecifications.isEmpty()) {
+            serverBuilder.tools(toolSpecifications);
+        }
+
+        McpSchema.ServerCapabilities.Builder capabilities = McpSchema.ServerCapabilities.builder()
+                .resources(false, false);
+        if (!toolSpecifications.isEmpty()) {
+            capabilities.tools(false);
+        }
+        serverBuilder.capabilities(capabilities.build())
+                .resources(skillPublisher.manifestResourceSpecification())
+                .resourceTemplates(skillPublisher.skillResourceTemplateSpecification());
+
+        McpSyncServer server = serverBuilder.build();
+        CountDownLatch latch = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                server.close();
+            } catch (Exception ignored) {
+                // ignore shutdown close failures
+            }
+            try {
+                transportProvider.close();
+            } catch (Exception ignored) {
+            }
+            latch.countDown();
+        }, "function-catalog-mcp-shutdown"));
+        latch.await();
     }
 
     private static AIFunctionRegistrar instantiateRegistrar(String registrarClassName) {
@@ -93,6 +143,7 @@ public final class AIFunctionMcpServerLauncher {
             List<String> scanPackages,
             Path stateFile,
             Path snapshotFile,
+            Path skillResourceRoot,
             boolean help
     ) {
         public static LaunchConfiguration parse(String[] args) {
@@ -100,6 +151,7 @@ public final class AIFunctionMcpServerLauncher {
             List<String> scanPackages = new ArrayList<>();
             Path stateFile = null;
             Path snapshotFile = null;
+            Path skillResourceRoot = null;
             boolean help = false;
 
             for (String arg : requireValue(args, "args")) {
@@ -126,14 +178,25 @@ public final class AIFunctionMcpServerLauncher {
                     snapshotFile = Path.of(arg.substring("--snapshot-file=".length())).toAbsolutePath().normalize();
                     continue;
                 }
+                if (arg.startsWith("--skill-resource-root=")) {
+                    skillResourceRoot = Path.of(arg.substring("--skill-resource-root=".length())).toAbsolutePath().normalize();
+                    continue;
+                }
                 throw new IllegalArgumentException("Unknown argument: " + arg);
             }
 
-            if (!help && registrarClasses.isEmpty() && scanPackages.isEmpty()) {
-                throw new IllegalArgumentException("Provide at least one --registrar-class or --scan argument.");
+            if (!help && registrarClasses.isEmpty() && scanPackages.isEmpty() && skillResourceRoot == null) {
+                throw new IllegalArgumentException("Provide at least one --registrar-class, --scan, or --skill-resource-root argument.");
             }
 
-            return new LaunchConfiguration(List.copyOf(registrarClasses), List.copyOf(scanPackages), stateFile, snapshotFile, help);
+            return new LaunchConfiguration(
+                    List.copyOf(registrarClasses),
+                    List.copyOf(scanPackages),
+                    stateFile,
+                    snapshotFile,
+                    skillResourceRoot,
+                    help
+            );
         }
 
         public static String usage() {
@@ -143,6 +206,7 @@ public final class AIFunctionMcpServerLauncher {
                     "  --scan=<package>           Fallback package scan for @AIFunction methods (repeatable)",
                     "  --state-file=<path>        Persisted function state JSON path",
                     "  --snapshot-file=<path>     Snapshot JSON path for live catalog visibility",
+                    "  --skill-resource-root=<path>  Tavall skill bundle root containing manifest.json and skills/",
                     "  --help                     Show this help"
             );
         }
