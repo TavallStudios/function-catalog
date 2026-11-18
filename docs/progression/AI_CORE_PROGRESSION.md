@@ -25,8 +25,8 @@ This record measures the module’s implementation maturity, API/integration sta
 | Module Type | `LIBRARY` |
 | Owning System | `Function Catalog` |
 | System Progression | [Function Catalog System Progression](FUNCTION_CATALOG_SYSTEM_PROGRESSION.md) |
-| Runtime Owner | `mcp-server` |
-| Primary Consumers | Named runtime owner: [`mcp-server`](../mcp-server/README.md); integration acceptance was not verified. |
+| Runtime Owner | `tavall-function-catalog-mcp-runtime` |
+| Primary Consumers | Named runtime owner: [`tavall-function-catalog-mcp-runtime`](../tavall-function-catalog-mcp-runtime/README.md); integration acceptance was not verified. |
 | Current Branch / PR Stack | [mainline integration #10](https://github.com/TavallStudios/function-catalog/pull/10), [WorldOps contract #19](https://github.com/TavallStudios/function-catalog/pull/19), [product intelligence #21](https://github.com/TavallStudios/function-catalog/pull/21); documentation update: [PR #37](https://github.com/TavallStudios/function-catalog/pull/37). |
 | Audited Revision | [`6e27cbef4b6538896a81f4dd28eb3f0c3ea70530`](https://github.com/TavallStudios/function-catalog/commit/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530) on `main` |
 
@@ -39,7 +39,7 @@ This record measures the module’s implementation maturity, API/integration sta
 | Implementation | 27 tracked production Java source files; responsibility boundary is present in Gradle settings/root build configuration |
 | Integration | Declared dependency graph and README relationships reviewed; consumer acceptance not verified |
 | Validation | Source/build/test tree audited through GitHub; Gradle commands were not run in this docs-only pass |
-| Runtime / Consumer Acceptance | Owner is `mcp-server`; consumer/runtime acceptance not established |
+| Runtime / Consumer Acceptance | Owner is `tavall-function-catalog-mcp-runtime`; consumer/runtime acceptance not established |
 | Deployment Verification | `N/A` for this non-runtime module |
 | Primary Blocker | Module-local `.tavallci/ci.yaml` is absent in the audited `main` tree; 27 test source files are tracked but no execution result was retrieved |
 | Next Slice | Add the required module CI definition and obtain test/consumer evidence appropriate to this module type |
@@ -70,7 +70,7 @@ This record measures the module’s implementation maturity, API/integration sta
 | --- | --- | --- | --- |
 | Root build and module source | Independent Gradle subproject | 27 tracked production Java source files; 27 files under `src/test`; no `src/integrationTest` files | [`settings.gradle.kts`](https://github.com/TavallStudios/function-catalog/blob/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530/settings.gradle.kts), [module tree](https://github.com/TavallStudios/function-catalog/tree/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530/ai-core) |
 | Module dependencies | Jackson, SLF4J, and ClassGraph; JUnit/AssertJ tests. | Declared in the root Gradle build; dependency resolution was not run | [`build.gradle.kts`](https://github.com/TavallStudios/function-catalog/blob/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530/build.gradle.kts) |
-| Runtime / primary consumer | mcp-server | No consumer acceptance verified | [Module README](../../ai-core/README.md) |
+| Runtime / primary consumer | tavall-function-catalog-mcp-runtime | No consumer acceptance verified | [Module README](../../ai-core/README.md) |
 
 ## Blockers
 

@@ -11,7 +11,7 @@
 
 ## About
 
-Function Catalog is an eight-project Gradle system for typed function definitions and discovery, provider integrations, provider-neutral agent execution, and an executable MCP server. `ai-core` owns catalog contracts; `agent-runtime` and its providers own agent execution; `mcp-server` is the executable runtime boundary.
+Function Catalog is an eight-project Gradle system for typed function definitions and discovery, provider integrations, provider-neutral agent execution, and an executable MCP server. `ai-core` owns catalog contracts; `agent-runtime` and its providers own agent execution; `tavall-function-catalog-mcp-runtime` is the executable runtime boundary.
 
 This record tracks cross-module progress and acceptance. Use each module Progression for its own source history and test evidence.
 
@@ -22,7 +22,7 @@ This record tracks cross-module progress and acceptance. Use each module Progres
 | Repository | [TavallStudios/function-catalog](https://github.com/TavallStudios/function-catalog) |
 | Audited main revision | [`6e27cbef4b6538896a81f4dd28eb3f0c3ea70530`](https://github.com/TavallStudios/function-catalog/commit/6e27cbef4b6538896a81f4dd28eb3f0c3ea70530) |
 | Build | Gradle multi-project; JDK 25 |
-| Runtime boundary | [`mcp-server`](../../mcp-server/README.md), executable over HTTP or stdio |
+| Runtime boundary | [`tavall-function-catalog-mcp-runtime`](../../tavall-function-catalog-mcp-runtime/README.md), executable over HTTP or stdio |
 | Current PR stack | Mainline integration [#10](https://github.com/TavallStudios/function-catalog/pull/10), MCP skill resources [#29](https://github.com/TavallStudios/function-catalog/pull/29), runtime/provider proposal [#13](https://github.com/TavallStudios/function-catalog/pull/13), and documentation [#37](https://github.com/TavallStudios/function-catalog/pull/37); separate product PRs [#19](https://github.com/TavallStudios/function-catalog/pull/19) and [#21](https://github.com/TavallStudios/function-catalog/pull/21) also appear in module README routing. |
 | Overall state | `PARTIAL` |
 
@@ -34,7 +34,7 @@ This record tracks cross-module progress and acceptance. Use each module Progres
 | Implementation | 73 production Java source files are tracked across the eight modules. |
 | Verification | 46 source files are tracked under `src/test`; no Gradle task or test suite was run in this documentation pass. Source presence is not a passing result. |
 | CI ownership | No module-local `.tavallci/ci.yaml` was found in the audited main tree. |
-| Runtime integration | `mcp-server` is configured as an application with HTTP and stdio launch paths. No runtime or consumer acceptance was verified. |
+| Runtime integration | `tavall-function-catalog-mcp-runtime` is configured as an application with HTTP and stdio launch paths. |
 | Deployment | GitHub deployment target and deployed source are not established by the evidence audited for this rollout; see the [system Deployment record](../TAVALL_FUNCTION_CATALOG_DEPLOYMENT.md). |
 | Current blocker | Module CI definitions and execution evidence are absent; provider/runtime and deployed-source acceptance remain unverified. |
 
@@ -43,13 +43,13 @@ This record tracks cross-module progress and acceptance. Use each module Progres
 | Module | Type | Runtime owner | Boundary | Module Progression |
 | --- | --- | --- | --- | --- |
 | [`gemini-sdk`](../../gemini-sdk/README.md) | `INTEGRATION` | None | Gemini 3 text/image client wrappers, response models, and parsing | [Progression](GEMINI_SDK_PROGRESSION.md) |
-| [`ai-core`](../../ai-core/README.md) | `LIBRARY` | `mcp-server` | Typed function catalog, registration, scoped views, schemas, and audit | [Progression](AI_CORE_PROGRESSION.md) |
+| [`ai-core`](../../ai-core/README.md) | `LIBRARY` | `tavall-function-catalog-mcp-runtime` | Typed function catalog, registration, scoped views, schemas, and audit | [Progression](AI_CORE_PROGRESSION.md) |
 | [`agent-runtime`](../../agent-runtime/README.md) | `LIBRARY` | None | Provider-neutral job execution, budgets, timeouts, and cancellation | [Progression](AGENT_RUNTIME_PROGRESSION.md) |
 | [`codex-agent-provider`](../../codex-agent-provider/README.md) | `PROVIDER` | `agent-runtime` | Codex agent provider | [Progression](CODEX_AGENT_PROVIDER_PROGRESSION.md) |
 | [`strands-agent-provider`](../../strands-agent-provider/README.md) | `PROVIDER` | `agent-runtime` | Strands agent provider through the MCP client boundary | [Progression](STRANDS_AGENT_PROVIDER_PROGRESSION.md) |
 | [`openai-sdk`](../../openai-sdk/README.md) | `INTEGRATION` | None | OpenAI client integration | [Progression](OPENAI_SDK_PROGRESSION.md) |
 | [`claude-sdk`](../../claude-sdk/README.md) | `INTEGRATION` | None | Anthropic Claude client integration | [Progression](CLAUDE_SDK_PROGRESSION.md) |
-| [`mcp-server`](../../mcp-server/README.md) | `RUNTIME` | Self | Executable HTTP and stdio MCP server | [Progression](MCP_SERVER_PROGRESSION.md) |
+| [`tavall-function-catalog-mcp-runtime`](../../tavall-function-catalog-mcp-runtime/README.md) | `RUNTIME` | Self | Executable HTTP and stdio MCP server | [Progression](TAVALL_FUNCTION_CATALOG_MCP_RUNTIME_PROGRESSION.md) |
 
 ## Dependencies and Integration
 
@@ -59,7 +59,7 @@ This record tracks cross-module progress and acceptance. Use each module Progres
 | `agent-runtime` | API dependency on `ai-core`; Jackson and SLF4J support provider-neutral jobs. | Declared in the root Gradle build; behavior was not executed. |
 | Agent providers | `codex-agent-provider` depends on `agent-runtime`; `strands-agent-provider` also uses the MCP client boundary. | Provider acceptance remains unverified. |
 | SDK integrations | Gemini uses Google GenAI; OpenAI and Claude depend on the shared catalog contracts and JSON/logging libraries. | External provider APIs and credentials were not exercised. |
-| `mcp-server` | Application boundary over `ai-core`, MCP libraries, Jackson/SLF4J, and embedded Tomcat. | HTTP/stdio execution and consumer acceptance were not tested. |
+| `tavall-function-catalog-mcp-runtime` | Application boundary over `ai-core`, MCP libraries, Jackson/SLF4J, and embedded Tomcat. | HTTP/stdio execution and consumer acceptance were not tested. |
 
 ## Progression Timeline
 

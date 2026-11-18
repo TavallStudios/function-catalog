@@ -290,7 +290,8 @@ class AIFunctionMcpServerTest {
 
     private Path repoRoot() {
         Path current = Path.of("").toAbsolutePath().normalize();
-        return current.getFileName() != null && "mcp-server".equals(current.getFileName().toString())
+        String dirName = current.getFileName() != null ? current.getFileName().toString() : "";
+        return ("mcp-server".equals(dirName) || "tavall-function-catalog-mcp-runtime".equals(dirName))
                 ? current.getParent()
                 : current;
     }
